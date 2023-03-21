@@ -1,3 +1,19 @@
+# -*- coding: utf-8 -*-
+
+# Max-Planck-Gesellschaft zur Förderung der Wissenschaften e.V. (MPG) is
+# holder of all proprietary rights on this computer program.
+# You can only use this computer program if you have closed
+# a license agreement with MPG or you get the right to use the computer
+# program from someone who is authorized to grant you that right.
+# Any use of the computer program without a valid license is prohibited and
+# liable to prosecution.
+#
+# Copyright©2023 Max-Planck-Gesellschaft zur Förderung
+# der Wissenschaften e.V. (MPG). acting on behalf of its Max Planck Institute
+# for Intelligent Systems. All rights reserved.
+#
+# Contact: mica@tue.mpg.de
+
 import os.path
 from enum import Enum
 from functools import reduce
@@ -42,6 +58,8 @@ I6D = matrix_to_rotation_6d(I)
 mediapipe_idx = np.load('flame/mediapipe/mediapipe_landmark_embedding.npz', allow_pickle=True, encoding='latin1')['landmark_indices'].astype(int)
 left_iris_flame = [4597, 4542, 4510, 4603, 4570]
 right_iris_flame = [4051, 3996, 3964, 3932, 4028]
+left_iris_mp = [468, 469, 470, 471, 472]
+right_iris_mp = [473, 474, 475, 476, 477]
 
 
 class View(Enum):
@@ -64,6 +82,7 @@ class FlashFlame(object):
         self.actor_name = self.config.config_name
         self.kernel_size = self.config.kernel_size
         self.sigma = None if self.config.sigma == -1 else self.config.sigma
+        self.global_step = 0
 
         logger.add(os.path.join(self.config.save_folder, self.actor_name, 'train.log'))
 
@@ -72,15 +91,13 @@ class FlashFlame(object):
         self.is_initializing = False
         self.image_size = torch.tensor([[config.image_size[0], config.image_size[1]]]).cuda()
         self.save_folder = self.config.save_folder
-        self.checkpoint_folder = self.save_folder + self.actor_name + '/checkpoint/'
-        self.input_folder = self.save_folder + self.actor_name + '/input/'
-        self.pyramid_folder = self.save_folder + self.actor_name + '/pyramid/'
-        self.mesh_folder = self.save_folder + self.actor_name + '/mesh/'
-        self.depth_folder = self.save_folder + self.actor_name + '/depth/'
-        self.writer = SummaryWriter(log_dir=self.save_folder + self.actor_name + '/logs')
-        self.use_mediapipe = True
-
+        self.checkpoint_folder = os.path.join(self.save_folder, self.actor_name, "checkpoint")
+        self.input_folder = os.path.join(self.save_folder, self.actor_name, "input")
+        self.pyramid_folder = os.path.join(self.save_folder, self.actor_name, "pyramid")
+        self.mesh_folder = os.path.join(self.save_folder, self.actor_name, "mesh")
+        self.depth_folder = os.path.join(self.save_folder, self.actor_name, "depth")
         self.create_output_folders()
+        self.writer = SummaryWriter(log_dir=self.save_folder + self.actor_name + '/logs')
         self.setup_renderer()
 
     def get_image_size(self):
@@ -92,9 +109,10 @@ class FlashFlame(object):
         Path(self.depth_folder).mkdir(parents=True, exist_ok=True)
         Path(self.mesh_folder).mkdir(parents=True, exist_ok=True)
         Path(self.input_folder).mkdir(parents=True, exist_ok=True)
+        Path(self.pyramid_folder).mkdir(parents=True, exist_ok=True)
 
     def setup_renderer(self):
-        mesh_file = './data/head_template_mesh.obj'
+        mesh_file = 'data/head_template_mesh.obj'
         self.config.image_size = self.get_image_size()
         self.flame = FLAME(self.config).to(self.device)
         self.flametex = FLAMETex(self.config).to(self.device)
@@ -124,7 +142,7 @@ class FlashFlame(object):
     def load_checkpoint(self, idx=-1):
         if not os.path.exists(self.checkpoint_folder):
             return False
-        snaps = sorted(glob(self.checkpoint_folder + '*.frame'))
+        snaps = sorted(glob(self.checkpoint_folder + '/*.frame'))
         if len(snaps) == 0:
             logger.info('Training from beginning...')
             return False
@@ -152,6 +170,7 @@ class FlashFlame(object):
         self.jaw = nn.Parameter(torch.from_numpy(flame_params['jaw']).to(self.device))
 
         self.frame = int(payload['frame_id'])
+        self.global_step = payload['global_step']
         self.update_prev_frame()
         self.image_size = torch.from_numpy(payload['img_size'])[None].to(self.device)
         self.setup_renderer()
@@ -185,7 +204,8 @@ class FlashFlame(object):
                 'K': opencv[2].clone().detach().cpu().numpy(),
             },
             'img_size': self.image_size.clone().detach().cpu().numpy()[0],
-            'frame_id': frame_id
+            'frame_id': frame_id,
+            'global_step': self.global_step
         }
 
         vertices, _, _ = self.flame(
@@ -194,13 +214,25 @@ class FlashFlame(object):
             expression_params=self.exp,
             eye_pose_params=self.eyes,
             jaw_pose_params=self.jaw,
-            eyelid_params=self.eyelids)
+            eyelid_params=self.eyelids
+        )
 
         f = self.diff_renderer.faces[0].cpu().numpy()
         v = vertices[0].cpu().numpy()
 
         trimesh.Trimesh(faces=f, vertices=v, process=False).export(f'{self.mesh_folder}/{frame_id}.ply')
         torch.save(frame, f'{self.checkpoint_folder}/{frame_id}.frame')
+
+    def save_canonical(self):
+        canon = os.path.join(self.save_folder, self.actor_name, "canonical.obj")
+        if not os.path.exists(canon):
+            from scipy.spatial.transform import Rotation as R
+            rotvec = np.zeros(3)
+            rotvec[0] = 12.0 * np.pi / 180.0
+            jaw = matrix_to_rotation_6d(torch.from_numpy(R.from_rotvec(rotvec).as_matrix())[None, ...].cuda()).float()
+            vertices = self.flame(cameras=torch.inverse(self.cameras.R), shape_params=self.shape, jaw_pose_params=jaw)[0].detach()
+            faces = self.diff_renderer.faces[0].cpu().numpy()
+            trimesh.Trimesh(faces=faces, vertices=vertices[0].cpu().numpy(), process=False).export(canon)
 
     def get_heatmap(self, values):
         l2 = tensor2im(values)
@@ -270,7 +302,7 @@ class FlashFlame(object):
 
     def parse_mask(self, ops, batch, visualization=False):
         _, _, h, w = ops['alpha_images'].shape
-        result = ops['mask_images_rendering'] * 0.5 + ops['mask_images']
+        result = ops['mask_images_rendering'] * 0.25 + ops['mask_images']
 
         # Lower the region for eyes blinking
         if not self.is_initializing:
@@ -295,37 +327,51 @@ class FlashFlame(object):
 
     def clone_params_tracking(self):
         params = [
-            {'params': [nn.Parameter(self.exp.clone().detach())], 'lr': 0.01, 'name': ['exp']},
-            {'params': [nn.Parameter(self.eyes.clone().detach())], 'lr': 0.001, 'name': ['eyes']},
-            {'params': [nn.Parameter(self.eyelids.clone().detach())], 'lr': 0.001, 'name': ['eyelids']},
-            {'params': [nn.Parameter(self.jaw.clone().detach())], 'lr': 0.001, 'name': ['jaw']},
-            {'params': [nn.Parameter(self.R.clone().detach())], 'lr': self.config.rotation_lr, 'name': ['R']},
-            {'params': [nn.Parameter(self.t.clone().detach())], 'lr': self.config.translation_lr, 'name': ['t']},
-            {'params': [nn.Parameter(self.sh.clone().detach())], 'lr': 0.001, 'name': ['sh']}
+            {'params': [nn.Parameter(self.exp.clone())], 'lr': 0.01, 'name': ['exp']},
+            {'params': [nn.Parameter(self.eyes.clone())], 'lr': 0.001, 'name': ['eyes']},
+            {'params': [nn.Parameter(self.eyelids.clone())], 'lr': 0.001, 'name': ['eyelids']},
+            {'params': [nn.Parameter(self.R.clone())], 'lr': self.config.rotation_lr, 'name': ['R']},
+            {'params': [nn.Parameter(self.t.clone())], 'lr': self.config.translation_lr, 'name': ['t']},
+            {'params': [nn.Parameter(self.sh.clone())], 'lr': 0.001, 'name': ['sh']}
         ]
+
+        if self.config.optimize_jaw:
+            params.append({'params': [nn.Parameter(self.jaw.clone().detach())], 'lr': 0.001, 'name': ['jaw']})
 
         return params
 
     def clone_params_color(self):
         params = [
-            {'params': [nn.Parameter(self.exp.clone().detach())], 'lr': 0.025, 'name': ['exp']},
-            {'params': [nn.Parameter(self.eyes.clone().detach())], 'lr': 0.001, 'name': ['eyes']},
-            {'params': [nn.Parameter(self.eyelids.clone().detach())], 'lr': 0.01, 'name': ['eyelids']},
-            {'params': [nn.Parameter(self.jaw.clone().detach())], 'lr': 0.001, 'name': ['jaw']},
-            {'params': [nn.Parameter(self.sh.clone().detach())], 'lr': 0.01, 'name': ['sh']},
-            {'params': [nn.Parameter(self.tex.clone().detach())], 'lr': 0.005, 'name': ['tex']},
-            {'params': [nn.Parameter(self.t.clone().detach())], 'lr': 0.005, 'name': ['t']},
-            {'params': [nn.Parameter(self.R.clone().detach())], 'lr': 0.005, 'name': ['R']},
-            {'params': [nn.Parameter(self.principal_point.clone().detach())], 'lr': 0.001, 'name': ['principal_point']},
-            {'params': [nn.Parameter(self.focal_length.clone().detach())], 'lr': 0.001, 'name': ['focal_length']}
+            {'params': [nn.Parameter(self.exp.clone())], 'lr': 0.025, 'name': ['exp']},
+            {'params': [nn.Parameter(self.eyes.clone())], 'lr': 0.001, 'name': ['eyes']},
+            {'params': [nn.Parameter(self.eyelids.clone())], 'lr': 0.01, 'name': ['eyelids']},
+            {'params': [nn.Parameter(self.sh.clone())], 'lr': 0.01, 'name': ['sh']},
+            {'params': [nn.Parameter(self.tex.clone())], 'lr': 0.005, 'name': ['tex']},
+            {'params': [nn.Parameter(self.t.clone())], 'lr': 0.005, 'name': ['t']},
+            {'params': [nn.Parameter(self.R.clone())], 'lr': 0.005, 'name': ['R']},
+            {'params': [nn.Parameter(self.principal_point.clone())], 'lr': 0.001, 'name': ['principal_point']},
+            {'params': [nn.Parameter(self.focal_length.clone())], 'lr': 0.001, 'name': ['focal_length']}
         ]
+
+        if self.config.optimize_shape:
+            params.append({'params': [nn.Parameter(self.shape.clone().detach())], 'lr': 0.025, 'name': ['shape']})
+
+        if self.config.optimize_jaw:
+            params.append({'params': [nn.Parameter(self.jaw.clone().detach())], 'lr': 0.001, 'name': ['jaw']})
 
         return params
 
+    @staticmethod
+    def reduce_loss(losses):
+        all_loss = 0.
+        for key in losses.keys():
+            all_loss = all_loss + losses[key]
+        losses['all_loss'] = all_loss
+        return all_loss
+
     def optimize_camera(self, batch, steps=1000):
         batch = self.to_cuda(batch)
-        images, landmarks, landmarks_dense = self.parse_batch(batch)
-        landmarks_dense = landmarks_dense[:, mediapipe_idx, :]
+        images, landmarks, landmarks_dense, lmk_dense_mask, lmk_mask = self.parse_batch(batch)
 
         h, w = images.shape[2:4]
         self.shape = batch['shape']
@@ -349,14 +395,13 @@ class FlashFlame(object):
                 image_size=self.image_size
             )
             _, lmk68, lmkMP = self.flame(cameras=torch.inverse(self.cameras.R), shape_params=self.shape, expression_params=self.exp, eye_pose_params=self.eyes, jaw_pose_params=self.jaw)
-            points68 = self.cameras.transform_points_screen(lmk68)
-            pointsMP = self.cameras.transform_points_screen(lmkMP)
+            points68 = self.cameras.transform_points_screen(lmk68)[..., :2]
+            pointsMP = self.cameras.transform_points_screen(lmkMP)[..., :2]
 
             losses = {}
             losses['pp_reg'] = torch.sum(self.principal_point ** 2)
-            losses['lmk68'] = util.lmk_loss(points68[..., :2], landmarks[..., :2], [h, w]) * self.config.w_lmks
-            if self.use_mediapipe:
-                losses['lmkMP'] = util.lmk_loss(pointsMP[..., :2], landmarks_dense[..., :2], [h, w]) * self.config.w_lmks
+            losses['lmk68'] = util.lmk_loss(points68, landmarks[..., :2], [h, w], lmk_mask) * self.config.w_lmks
+            losses['lmkMP'] = util.lmk_loss(pointsMP, landmarks_dense[..., :2], [h, w], lmk_dense_mask) * self.config.w_lmks
 
             all_loss = 0.
             for key in losses.keys():
@@ -379,7 +424,7 @@ class FlashFlame(object):
 
     def optimize_color(self, batch, pyramid, params_func, pho_weight_func, reg_from_prev=False):
         self.update_prev_frame()
-        images, landmarks, landmarks_dense = self.parse_batch(batch)
+        images, landmarks, landmarks_dense, lmk_dense_mask, lmk_mask = self.parse_batch(batch)
 
         aspect_ratio = util.get_aspect_ratio(images)
         h, w = images.shape[2:4]
@@ -409,18 +454,17 @@ class FlashFlame(object):
             flipped = torch.flip(img, [2, 3])
 
             image_lmks68 = landmarks * scale
-
-            if self.use_mediapipe:
-                image_lmksMP = landmarks_dense[:, mediapipe_idx, :] * scale
-                image_lmks_dense = landmarks_dense * scale
-                left_iris = image_lmks_dense[:, [468, 469, 470, 471, 472], :]
-                right_iris = image_lmks_dense[:, [473, 474, 475, 476, 477], :]
+            image_lmksMP = landmarks_dense * scale
+            left_iris = batch['left_iris'] * scale
+            right_iris = batch['right_iris'] * scale
+            mask_left_iris = batch['mask_left_iris'] * scale
+            mask_right_iris = batch['mask_right_iris'] * scale
 
             self.diff_renderer.rasterizer.reset()
 
             best_loss = np.inf
 
-            for p in range(iters):  # improves jittering reduction
+            for p in range(iters):
                 if p % 16 == 0 and p < iters:
                     self.diff_renderer.rasterizer.reset()
                 losses = {}
@@ -447,61 +491,59 @@ class FlashFlame(object):
                 right_eye, left_eye = eyes[:, :6], eyes[:, 6:]
 
                 # Landmarks sparse term
-                losses['lmk_oval'] = util.oval_lmk_loss(proj_lmks68, image_lmks68, image_size) * self.config.w_lmks_oval
-
-                if self.use_mediapipe:
-                    losses['lmkMP'] = util.face_lmk_loss(proj_lmksMP, image_lmksMP, image_size, True) * self.config.w_lmks
-                    losses['lmk_eye'] = util.eye_closure_lmk_loss(proj_lmksMP, image_lmksMP, image_size) * self.config.w_lmks_lid
-                    losses['lmk_mouth'] = util.mouth_lmk_loss(proj_lmksMP, image_lmksMP, image_size, True) * self.config.w_lmks_mouth
-                    losses['lmk_iris_left'] = util.lmk_loss(proj_vertices[:, left_iris_flame, ...], left_iris, image_size) * self.config.w_lmks_iris
-                    losses['lmk_iris_right'] = util.lmk_loss(proj_vertices[:, right_iris_flame, ...], right_iris, image_size) * self.config.w_lmks_iris
+                losses['loss/lmk_oval'] = util.oval_lmk_loss(proj_lmks68, image_lmks68, image_size, lmk_mask) * self.config.w_lmks_oval
+                losses['loss/lmk_MP'] = util.face_lmk_loss(proj_lmksMP, image_lmksMP, image_size, True, lmk_dense_mask) * self.config.w_lmks
+                losses['loss/lmk_eye'] = util.eye_closure_lmk_loss(proj_lmksMP, image_lmksMP, image_size, lmk_dense_mask) * self.config.w_lmks_lid
+                losses['loss/lmk_mouth'] = util.mouth_lmk_loss(proj_lmksMP, image_lmksMP, image_size, True, lmk_dense_mask) * self.config.w_lmks_mouth
+                losses['loss/lmk_iris_left'] = util.lmk_loss(proj_vertices[:, left_iris_flame, ...], left_iris, image_size, mask_left_iris) * self.config.w_lmks_iris
+                losses['loss/lmk_iris_right'] = util.lmk_loss(proj_vertices[:, right_iris_flame, ...], right_iris, image_size, mask_right_iris) * self.config.w_lmks_iris
 
                 # Reguralizers
-                losses['e_r'] = torch.sum(exp ** 2) * self.config.w_exp
-                losses['e_sym_r'] = torch.sum((right_eye - left_eye) ** 2) * 8.0
-                losses['j_r'] = torch.sum((I6D - jaw) ** 2) * 16.0
-                losses['e_left_r'] = torch.sum((I6D - left_eye) ** 2)
-                losses['e_right_r'] = torch.sum((I6D - right_eye) ** 2)
+                losses['reg/exp'] = torch.sum(exp ** 2) * self.config.w_exp
+                losses['reg/sym'] = torch.sum((right_eye - left_eye) ** 2) * 8.0
+                losses['reg/jaw'] = torch.sum((I6D - jaw) ** 2) * 16.0
+                losses['reg/eye_lids'] = torch.sum((eyelids[:, 0] - eyelids[:, 1]) ** 2)
+                losses['reg/eye_left'] = torch.sum((I6D - left_eye) ** 2)
+                losses['reg/eye_right'] = torch.sum((I6D - right_eye) ** 2)
 
                 if util.is_optimizable('shape', params):
-                    losses['shape_r'] = torch.sum((shape - self.mica_shape) ** 2) * self.config.w_shape
+                    losses['reg/shape'] = torch.sum((shape - self.mica_shape) ** 2) * self.config.w_shape
 
                 if util.is_optimizable('tex', params):
-                    losses['tex_r'] = torch.sum(tex ** 2) * self.config.w_tex
+                    losses['reg/tex'] = torch.sum(tex ** 2) * self.config.w_tex
 
                 if util.is_optimizable('principal_point', params):
-                    losses['pp_r'] = torch.sum(pp ** 2)
+                    losses['reg/pp'] = torch.sum(pp ** 2)
 
                 # Temporal smoothing (only to t - 1)
                 if reg_from_prev:
-                    losses['e_prev_r'] = torch.sum((self.prev_exp - exp) ** 2) * 0.01
-                    losses['t_prev_r'] = torch.sum((self.prev_t - t) ** 2) * 100.0
-                    losses['R_prev_r'] = torch.sum((self.prev_R - R) ** 2) * 100.0
+                    losses['reg/exp_prev_r'] = torch.sum((self.prev_exp - exp) ** 2) * 0.01
+                    losses['reg/trans_prev_r'] = torch.sum((self.prev_t - t) ** 2) * 100.0
+                    losses['reg/rot_prev_r'] = torch.sum((self.prev_R - R) ** 2) * 100.0
 
                 # Render RGB
-                albedos = self.flametex(tex) / 255.
+                albedos = self.flametex(tex)
                 ops = self.diff_renderer(vertices, albedos, sh, self.cameras)
 
                 # Photometric dense term
                 grid = ops['position_images'].permute(0, 2, 3, 1)[:, :, :, :2]
                 sampled_image = F.grid_sample(flipped, grid * aspect_ratio, align_corners=False)
-                losses['pho'] = util.pixel_loss(ops['images'], sampled_image, self.parse_mask(ops, batch)) * pho_weight_func(k)
+                losses['loss/pho'] = util.pixel_loss(ops['images'], sampled_image, self.parse_mask(ops, batch)) * pho_weight_func(k)
 
-                all_loss = 0.
-                for key in losses.keys():
-                    all_loss = all_loss + losses[key]
-                losses['all_loss'] = all_loss
-
+                all_loss = self.reduce_loss(losses)
                 optimizer.zero_grad()
                 all_loss.backward()
                 optimizer.step()
+
+                for key in losses.keys():
+                    self.writer.add_scalar(key, losses[key], global_step=self.global_step)
+
+                self.global_step += 1
 
                 if p % iters == 0:
                     logs.append(f"Color loss for level {k} [frame {str(self.frame).zfill(4)}] =" + reduce(lambda a, b: a + f' {b}={round(losses[b].item(), 4)}', [""] + list(losses.keys())))
 
                 loss_color = all_loss.item()
-
-                # self.writer.add_scalar(f'color/level_{k}', loss_color, global_step=p)
 
                 if loss_color < best_loss:
                     best_loss = loss_color
@@ -511,10 +553,7 @@ class FlashFlame(object):
 
     def checkpoint(self, batch, visualizations=[[View.GROUND_TRUTH, View.LANDMARKS, View.HEATMAP], [View.COLOR_OVERLAY, View.SHAPE_OVERLAY, View.SHAPE]], frame_dst='/video', save=True, dump_directly=False):
         batch = self.to_cuda(batch)
-        images, landmarks, landmarks_dense = self.parse_batch(batch)
-
-        if self.use_mediapipe:
-            landmarks_dense = landmarks_dense[:, mediapipe_idx, :]
+        images, landmarks, landmarks_dense, _, _ = self.parse_batch(batch)
 
         input_image = util.to_image(batch['image'].clone()[0].cpu().numpy())
 
@@ -545,7 +584,7 @@ class FlashFlame(object):
             lmk68 = self.cameras.transform_points_screen(lmk68, image_size=self.image_size)
             lmkMP = self.cameras.transform_points_screen(lmkMP, image_size=self.image_size)
 
-            albedos = self.flametex(self.tex) / 255.
+            albedos = self.flametex(self.tex)
             albedos = F.interpolate(albedos, self.get_image_size(), mode='bilinear')
             ops = self.diff_renderer(vertices, albedos, self.sh, cameras=self.cameras)
             mask = (self.parse_mask(ops, batch, visualization=True) > 0).float()
@@ -566,11 +605,9 @@ class FlashFlame(object):
                         row.append(shape)
                     if view == View.LANDMARKS:
                         gt_lmks = images.clone()
-                        if self.use_mediapipe:
-                            gt_lmks = util.tensor_vis_landmarks(gt_lmks, landmarks_dense, color='g')
-                        gt_lmks = util.tensor_vis_landmarks(gt_lmks, landmarks[:, :17, :], color='g')
-                        lmks = util.tensor_vis_landmarks(gt_lmks, lmk68, color='r')[0].cpu().numpy()
-                        row.append(lmks)
+                        gt_lmks = util.tensor_vis_landmarks(gt_lmks, torch.cat([landmarks_dense, landmarks[:, :17, :]], dim=1), color='g')
+                        gt_lmks = util.tensor_vis_landmarks(gt_lmks, torch.cat([lmkMP, lmk68[:, :17, :]], dim=1), color='r')
+                        row.append(gt_lmks[0].cpu().numpy())
                     if view == View.SHAPE_OVERLAY:
                         shape = self.render_shape(vertices, white=False)[0] * shape_mask
                         blend = images[0] * (1 - shape_mask) + images[0] * shape_mask * 0.3 + shape * 0.7 * shape_mask
@@ -597,13 +634,13 @@ class FlashFlame(object):
             self.save_checkpoint(frame_id)
 
             # DEPTH
-            depth_view = ops['position_view_images'] * ops['mask_images_depth']
+            depth_view = self.diff_renderer.render_depth(vertices, cameras=self.cameras, faces=torch.cat([util.get_flame_extra_faces(), self.diff_renderer.faces], dim=1))
             depth = depth_view[0].permute(1, 2, 0)[..., 2:].cpu().numpy() * 1000.0
             cv2.imwrite('{}/{}.png'.format(self.depth_folder, frame_id), depth.astype(np.uint16))
 
     def optimize_frame(self, batch):
         batch = self.to_cuda(batch)
-        images, landmarks, landmarks_dense = self.parse_batch(batch)
+        images = self.parse_batch(batch)[0]
         h, w = images.shape[2:4]
         pyramid_size = np.array([h, w])
         pyramid = util.get_gaussian_pyramid([(pyramid_size * size, util.round_up_to_odd(steps)) for size, steps in self.sampling], images, self.kernel_size, self.sigma)
@@ -624,10 +661,20 @@ class FlashFlame(object):
         landmarks = batch['lmk']
         landmarks_dense = batch['dense_lmk']
 
-        if landmarks_dense.int().sum().item() == 0:
-            self.use_mediapipe = False
+        lmk_dense_mask = ~(landmarks_dense.sum(2, keepdim=True) == 0)
+        lmk_mask = ~(landmarks.sum(2, keepdim=True) == 0)
 
-        return images, landmarks, landmarks_dense
+        left_iris = landmarks_dense[:, left_iris_mp, :]
+        right_iris = landmarks_dense[:, right_iris_mp, :]
+        mask_left_iris = lmk_dense_mask[:, left_iris_mp, :]
+        mask_right_iris = lmk_dense_mask[:, right_iris_mp, :]
+
+        batch['left_iris'] = left_iris
+        batch['right_iris'] = right_iris
+        batch['mask_left_iris'] = mask_left_iris
+        batch['mask_right_iris'] = mask_right_iris
+
+        return images, landmarks, landmarks_dense[:, mediapipe_idx, :2], lmk_dense_mask[:, mediapipe_idx, :], lmk_mask
 
     def prepare_data(self):
         self.data_generator = GeneratorDataset(self.config.actor, self.config)
@@ -652,6 +699,8 @@ class FlashFlame(object):
             self.optimize_color(batch, pyramid, self.clone_params_color, weighting)
             self.checkpoint(batch, visualizations=[[View.GROUND_TRUTH, View.COLOR_OVERLAY, View.LANDMARKS, View.SHAPE]], frame_dst='/initialization')
             self.frame += 1
+
+        self.save_canonical()
 
     def run(self):
         self.prepare_data()

@@ -1,17 +1,30 @@
+# -*- coding: utf-8 -*-
+
+# Max-Planck-Gesellschaft zur Förderung der Wissenschaften e.V. (MPG) is
+# holder of all proprietary rights on this computer program.
+# You can only use this computer program if you have closed
+# a license agreement with MPG or you get the right to use the computer
+# program from someone who is authorized to grant you that right.
+# Any use of the computer program without a valid license is prohibited and
+# liable to prosecution.
+#
+# Copyright©2023 Max-Planck-Gesellschaft zur Förderung
+# der Wissenschaften e.V. (MPG). acting on behalf of its Max Planck Institute
+# for Intelligent Systems. All rights reserved.
+#
+# Contact: mica@tue.mpg.de
+
 import argparse
-import os
 from pathlib import Path
 
 from yacs.config import CfgNode as CN
 
 cfg = CN()
 
-local = os.path.exists("/home/wzielonka/Cluster") or os.path.exists("/home/wzielonka-local/Cluster")
-
 cfg.flame_geom_path = 'data/FLAME2020/generic_model.pkl'
 cfg.flame_template_path = 'data/uv_template.obj'
-cfg.flame_lmk_path = 'data/FLAME2020/landmark_embedding.npy'
-cfg.tex_space_path = 'data/FLAME2020/FLAME_albedo_from_BFM.npz'
+cfg.flame_lmk_path = 'data/landmark_embedding.npy'
+cfg.tex_space_path = 'data/FLAME2020/FLAME_texture.npz'
 
 cfg.num_shape_params = 300
 cfg.num_exp_params = 100
@@ -30,6 +43,7 @@ cfg.rotation_lr = 0.01
 cfg.translation_lr = 0.003
 cfg.sampling = [[0.5, 90], [1.0, 80], [2.0, 70]]
 cfg.optimize_shape = False
+cfg.optimize_jaw = False
 cfg.crop_image = True
 
 cfg.save_folder = './test_results/'
@@ -70,12 +84,6 @@ def parse_args():
         cfg.cfg_file = cfg_file
 
     cfg.config_name = Path(args.cfg).stem
-
-    if local:
-        cfg.save_folder = './test_results/'
-
-    if not local:
-        cfg.actor = cfg.actor.replace('PycharmProjects', 'projects')
 
     return cfg
 

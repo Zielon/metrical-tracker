@@ -54,7 +54,7 @@ class GeneratorDataset(Dataset, ABC):
         if os.path.exists(bbox_path):
             bbox = torch.load(bbox_path)
 
-        for imagepath in tqdm(self.images, miniters=500):
+        for imagepath in tqdm(self.images):
             lmk_path = imagepath.replace('source', 'kpt').replace('png', 'npy').replace('jpg', 'npy')
             lmk_path_dense = imagepath.replace('source', 'kpt_dense').replace('png', 'npy').replace('jpg', 'npy')
 

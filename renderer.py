@@ -1,8 +1,19 @@
-"""
-Author: Yao Feng
-Copyright (c) 2020, Yao Feng
-All rights reserved.
-"""
+# -*- coding: utf-8 -*-
+
+# Max-Planck-Gesellschaft zur Förderung der Wissenschaften e.V. (MPG) is
+# holder of all proprietary rights on this computer program.
+# You can only use this computer program if you have closed
+# a license agreement with MPG or you get the right to use the computer
+# program from someone who is authorized to grant you that right.
+# Any use of the computer program without a valid license is prohibited and
+# liable to prosecution.
+#
+# Copyright©2023 Max-Planck-Gesellschaft zur Förderung
+# der Wissenschaften e.V. (MPG). acting on behalf of its Max Planck Institute
+# for Intelligent Systems. All rights reserved.
+#
+# Contact: mica@tue.mpg.de
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -52,7 +63,7 @@ class Renderer(nn.Module):
         uvfaces = faces.textures_idx[None, ...]  # (N, F, 3)
         faces = faces.verts_idx[None, ...]
 
-        mask = torch.from_numpy(imread('./data/uv_mask_eyes.png') / 255.).permute(2, 0, 1).cuda()[0:3, :, :]
+        mask = torch.from_numpy(imread('data/uv_mask_eyes.png') / 255.).permute(2, 0, 1).cuda()[0:3, :, :]
         mask = mask > 0.
         mask = F.interpolate(mask[None].float(), [2048, 2048], mode='bilinear')
 
@@ -113,6 +124,21 @@ class Renderer(nn.Module):
         sh = sh * self.constant_factor[None, :, None, None]
         shading = torch.sum(sh_coeff[:, :, :, None, None] * sh[:, :, None, :, :], 1)  # [bz, 9, 3, h, w]
         return shading
+
+    def render_depth(self, vertices_world, cameras, faces=None):
+        self.rasterizer.reset()
+        B = vertices_world.shape[0]
+        if faces is None:
+            faces = self.faces.expand(B, -1, -1)
+        meshes_world = Meshes(verts=vertices_world.float(), faces=faces.long())
+        face_vertices_view = util.face_vertices(cameras.get_world_to_view_transform().transform_points(vertices_world), faces)
+        depth_mask = util.face_vertices(self.masking.get_mask_depth(), faces)
+        attributes = torch.cat([face_vertices_view, depth_mask], -1)
+        rendering = self.rasterizer(meshes_world, attributes, cameras=cameras)[0]
+        view_vertices_images = rendering[:, 0:3, :, :].detach()
+        mask = rendering[:, 3:6, :, :].detach() > 0
+
+        return view_vertices_images * mask
 
     def forward(self, vertices_world, albedos, lights, cameras):
         B = vertices_world.shape[0]

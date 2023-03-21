@@ -1,3 +1,19 @@
+# -*- coding: utf-8 -*-
+
+# Max-Planck-Gesellschaft zur Förderung der Wissenschaften e.V. (MPG) is
+# holder of all proprietary rights on this computer program.
+# You can only use this computer program if you have closed
+# a license agreement with MPG or you get the right to use the computer
+# program from someone who is authorized to grant you that right.
+# Any use of the computer program without a valid license is prohibited and
+# liable to prosecution.
+#
+# Copyright©2023 Max-Planck-Gesellschaft zur Förderung
+# der Wissenschaften e.V. (MPG). acting on behalf of its Max Planck Institute
+# for Intelligent Systems. All rights reserved.
+#
+# Contact: mica@tue.mpg.de
+
 import cv2
 import numpy as np
 import torch
@@ -39,12 +55,12 @@ def opencv_to_opengl(R, t):
     '''
             | R | t |
             | 0 | 1 |
-            
+
             inverse is
-            
+
             | R^T | -R^T * t |
             | 0   | 1        |
-             
+
     '''
 
     # Transpose rotation (row to column wise) and adjust camera position for the new rotation matrix
@@ -71,31 +87,31 @@ def l2_distance(verts1, verts2):
     return torch.sqrt(((verts1 - verts2) ** 2).sum(2)).mean(1).mean()
 
 
-def lmk_loss(opt_lmks, target_lmks, image_size):
+def lmk_loss(opt_lmks, target_lmks, image_size, lmk_mask):
     h, w = image_size
     size = torch.tensor([1 / w, 1 / h]).float().cuda()[None, None, ...]
     diff = torch.pow(opt_lmks - target_lmks, 2)
-    return (diff * size).mean()
+    return (diff * size * lmk_mask).mean()
 
 
-def face_lmk_loss(opt_lmks, target_lmks, image_size, is_mediapipe):
+def face_lmk_loss(opt_lmks, target_lmks, image_size, is_mediapipe, lmk_mask):
     h, w = image_size
     size = torch.tensor([1 / w, 1 / h]).float().cuda()[None, None, ...]
     diff = torch.pow(opt_lmks - target_lmks, 2)
     if not is_mediapipe:
-        return (diff * face_mask * nose_mask * oval_mask * size).mean()
-    return (diff * nose_mask_mp * size).mean()
+        return (diff * face_mask * nose_mask * oval_mask * size * lmk_mask).mean()
+    return (diff * nose_mask_mp * size * lmk_mask).mean()
 
 
-def oval_lmk_loss(opt_lmks, target_lmks, image_size):
+def oval_lmk_loss(opt_lmks, target_lmks, image_size, lmk_mask):
     oval_ids = [i for i in range(17)]
     h, w = image_size
     size = torch.tensor([1 / w, 1 / h]).float().cuda()[None, None, ...]
     diff = torch.pow(opt_lmks[:, oval_ids, :] - target_lmks[:, oval_ids, :], 2)
-    return (diff * size).mean()
+    return (diff * size * lmk_mask[:, oval_ids, :]).mean()
 
 
-def mouth_lmk_loss(opt_lmks, target_lmks, image_size, is_mediapipe):
+def mouth_lmk_loss(opt_lmks, target_lmks, image_size, is_mediapipe, lmk_mask):
     if not is_mediapipe:
         mouth_ids = [i for i in range(49, 68)]
     else:
@@ -103,10 +119,10 @@ def mouth_lmk_loss(opt_lmks, target_lmks, image_size, is_mediapipe):
     h, w = image_size
     size = torch.tensor([1 / w, 1 / h]).float().cuda()[None, None, ...]
     diff = torch.pow(opt_lmks[:, mouth_ids, :] - target_lmks[:, mouth_ids, :], 2)
-    return (diff * size).mean()
+    return (diff * size * lmk_mask[:, mouth_ids, :]).mean()
 
 
-def eye_closure_lmk_loss(opt_lmks, target_lmks, image_size):
+def eye_closure_lmk_loss(opt_lmks, target_lmks, image_size, lmk_mask):
     upper_eyelid_lmk_ids = [47, 46, 45, 29, 30, 31]
     lower_eyelid_lmk_ids = [39, 40, 41, 25, 24, 23]
     h, w = image_size
@@ -114,10 +130,10 @@ def eye_closure_lmk_loss(opt_lmks, target_lmks, image_size):
     diff_opt = opt_lmks[:, upper_eyelid_lmk_ids, :] - opt_lmks[:, lower_eyelid_lmk_ids, :]
     diff_target = target_lmks[:, upper_eyelid_lmk_ids, :] - target_lmks[:, lower_eyelid_lmk_ids, :]
     diff = torch.pow(diff_opt - diff_target, 2)
-    return (diff * size).mean()
+    return (diff * size * lmk_mask[:, upper_eyelid_lmk_ids, :]).mean()
 
 
-def mouth_closure_lmk_loss(opt_lmks, target_lmks, image_size):
+def mouth_closure_lmk_loss(opt_lmks, target_lmks, image_size, lmk_mask):
     upper_mouth_lmk_ids = [49, 50, 51, 52, 53, 61, 62, 63]
     lower_mouth_lmk_ids = [59, 58, 57, 56, 55, 67, 66, 65]
     h, w = image_size
@@ -125,7 +141,7 @@ def mouth_closure_lmk_loss(opt_lmks, target_lmks, image_size):
     diff_opt = opt_lmks[:, upper_mouth_lmk_ids, :] - opt_lmks[:, lower_mouth_lmk_ids, :]
     diff_target = target_lmks[:, upper_mouth_lmk_ids, :] - target_lmks[:, lower_mouth_lmk_ids, :]
     diff = torch.pow(diff_opt - diff_target, 2)
-    return (diff * size).mean()
+    return (diff * size * lmk_mask[:, upper_mouth_lmk_ids, :]).mean()
 
 
 def pixel_loss(opt_img, target_img, mask=None):
@@ -346,7 +362,7 @@ def round_up_to_odd(f):
     return int(np.ceil(f) // 2 * 2 + 1)
 
 
-def grid_sample(image, optical):
+def grid_sample(image, optical, align_corners=False):
     N, C, IH, IW = image.shape
     _, H, W, _ = optical.shape
 
@@ -396,3 +412,38 @@ def grid_sample(image, optical):
                se_val.view(N, C, H, W) * se.view(N, 1, H, W))
 
     return out_val
+
+
+def get_flame_extra_faces():
+    return torch.from_numpy(
+        np.array(
+            [[1573, 1572, 1860],
+             [1742, 1862, 1572],
+             [1830, 1739, 1665],
+             [2857, 2862, 2730],
+             [2708, 2857, 2730],
+             [1862, 1742, 1739],
+             [1830, 1862, 1739],
+             [1852, 1835, 1666],
+             [1835, 1665, 1666],
+             [2862, 2861, 2731],
+             [1747, 1742, 1594],
+             [3497, 1852, 3514],
+             [1595, 1747, 1594],
+             [1746, 1747, 1595],
+             [1742, 1572, 1594],
+             [2941, 3514, 2783],
+             [2708, 2945, 2857],
+             [2941, 3497, 3514],
+             [1852, 1666, 3514],
+             [2930, 2933, 2782],
+             [2933, 2941, 2783],
+             [2862, 2731, 2730],
+             [2945, 2930, 2854],
+             [1835, 1830, 1665],
+             [2857, 2945, 2854],
+             [1572, 1862, 1860],
+             [2854, 2930, 2782],
+             [2708, 2709, 2943],
+             [2782, 2933, 2783],
+             [2708, 2943, 2945]])).cuda()[None, ...]

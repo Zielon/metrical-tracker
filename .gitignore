@@ -1,7 +1,7 @@
+input
 data
 test_results
-input
-input_copy
+output
 images
 FFHQ
 FFHQ_seg
@@ -140,6 +140,10 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
-inha/nerf
-inha/condor
-transformations/nerf
+
+!input/wojtek/identity.npy
+!input/wojtek/video.mp4
+!input/duda/identity.npy
+!input/duda/video.mp4
+!input/justin/identity.npy
+!input/justin/video.mp4

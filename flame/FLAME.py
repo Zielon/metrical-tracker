@@ -1,17 +1,19 @@
 # -*- coding: utf-8 -*-
-#
+
 # Max-Planck-Gesellschaft zur Förderung der Wissenschaften e.V. (MPG) is
 # holder of all proprietary rights on this computer program.
-# Using this computer program means that you agree to the terms
-# in the LICENSE file included with this software distribution.
-# Any use not explicitly granted by the LICENSE is prohibited.
+# You can only use this computer program if you have closed
+# a license agreement with MPG or you get the right to use the computer
+# program from someone who is authorized to grant you that right.
+# Any use of the computer program without a valid license is prohibited and
+# liable to prosecution.
 #
-# Copyright©2019 Max-Planck-Gesellschaft zur Förderung
+# Copyright©2023 Max-Planck-Gesellschaft zur Förderung
 # der Wissenschaften e.V. (MPG). acting on behalf of its Max Planck Institute
 # for Intelligent Systems. All rights reserved.
 #
-# For comments or questions, please email us at deca@tue.mpg.de
-# For commercial licensing contact, please contact ps-license@tuebingen.mpg.de
+# Contact: mica@tue.mpg.de
+
 import os
 import pickle
 
@@ -20,7 +22,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from pytorch3d.renderer import look_at_view_transform
 from pytorch3d.transforms import rotation_6d_to_matrix, matrix_to_rotation_6d
 
 from flame.lbs import lbs
@@ -272,21 +273,26 @@ class FLAME(nn.Module):
 
 
 class FLAMETex(nn.Module):
-    """
-    current FLAME texture are adapted from BFM Texture Model
-    """
-
     def __init__(self, config):
         super(FLAMETex, self).__init__()
         tex_space = np.load(config.tex_space_path)
-        mu_key = 'MU'
-        pc_key = 'PC'
-        n_pc = 199
+        # FLAME texture
+        if 'tex_dir' in tex_space.files:
+            mu_key = 'mean'
+            pc_key = 'tex_dir'
+            n_pc = 200
+            scale = 1
+        # BFM to FLAME texture
+        else:
+            mu_key = 'MU'
+            pc_key = 'PC'
+            n_pc = 199
+            scale = 255.0
         texture_mean = tex_space[mu_key].reshape(1, -1)
         texture_basis = tex_space[pc_key].reshape(-1, n_pc)
         n_tex = config.tex_params
-        texture_mean = torch.from_numpy(texture_mean).float()[None, ...] * 255.0
-        texture_basis = torch.from_numpy(texture_basis[:, :n_tex]).float()[None, ...] * 255.0
+        texture_mean = torch.from_numpy(texture_mean).float()[None, ...] * scale
+        texture_basis = torch.from_numpy(texture_basis[:, :n_tex]).float()[None, ...] * scale
         self.register_buffer('texture_mean', texture_mean)
         self.register_buffer('texture_basis', texture_basis)
         self.image_size = config.image_size
@@ -296,4 +302,4 @@ class FLAMETex(nn.Module):
         texture = texture.reshape(texcode.shape[0], 512, 512, 3).permute(0, 3, 1, 2)
         texture = F.interpolate(texture, self.image_size, mode='bilinear')
         texture = texture[:, [2, 1, 0], :, :]
-        return texture
+        return texture / 255.
