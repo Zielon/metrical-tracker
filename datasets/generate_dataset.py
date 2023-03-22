@@ -39,7 +39,7 @@ class GeneratorDataset(Dataset, ABC):
 
     def process_face(self, image):
         lmks, scores, detected_faces = self.face_detector.get_landmarks_from_image(image, return_landmark_score=True, return_bboxes=True)
-        if detected_faces is not None and len(detected_faces) == 0:
+        if detected_faces is None:
             lmks = None
         else:
             lmks = lmks[0]

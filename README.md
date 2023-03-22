@@ -59,6 +59,7 @@ python tracker.py --cfg ./configs/actors/duda.yml
 #### Tips
 
 - in the case of fast-changing sequences you might adjust the learning rate for **R** and **T** in the config.
+- MediaPipe sometimes detects wrong landmarks for the first frame in the sequence. You might skip this frame in optimization.
 - there are many hyper-parameters involved in the optimization, please look at the `config.py` and tweak them to further improve
   your results.
 
