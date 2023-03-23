@@ -4,5 +4,6 @@ actor: './input/duda'
 save_folder: './output/'
 optimize_shape: true
 optimize_jaw: true
+begin_frames: 1
 keyframes: [ 1, 2 ]
-sampling: [ [ 0.5, 200 ], [ 1.0, 60 ], [ 2.0, 60 ] ]
+pyr_levels: [ [ 0.5, 120 ], [ 1.0, 80 ], [ 2.0, 70 ] ]

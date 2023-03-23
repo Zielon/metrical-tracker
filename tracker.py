@@ -72,12 +72,12 @@ class View(Enum):
     DEPTH = 64
 
 
-class FlashFlame(object):
+class Tracker(object):
     def __init__(self, config, device='cuda:0'):
         self.config = config
         self.device = device
         self.face_detector = FaceDetector('google')
-        self.sampling = config.sampling
+        self.pyr_levels = config.pyr_levels
         self.cameras = PerspectiveCameras()
         self.actor_name = self.config.config_name
         self.kernel_size = self.config.kernel_size
@@ -295,7 +295,8 @@ class FlashFlame(object):
         self.jaw = nn.Parameter(matrix_to_rotation_6d(I))
         self.eyelids = nn.Parameter(torch.zeros(bz, 2).float().to(self.device))
 
-    def save_tensor(self, tensor, path='tensor.jpg'):
+    @staticmethod
+    def save_tensor(tensor, path='tensor.jpg'):
         img = (tensor[0].detach().cpu().numpy().transpose(1, 2, 0).copy() * 255)[:, :, [2, 1, 0]]
         img = np.minimum(np.maximum(img, 0), 255).astype(np.uint8)
         cv2.imwrite(path, img)
@@ -643,7 +644,7 @@ class FlashFlame(object):
         images = self.parse_batch(batch)[0]
         h, w = images.shape[2:4]
         pyramid_size = np.array([h, w])
-        pyramid = util.get_gaussian_pyramid([(pyramid_size * size, util.round_up_to_odd(steps)) for size, steps in self.sampling], images, self.kernel_size, self.sigma)
+        pyramid = util.get_gaussian_pyramid([(pyramid_size * size, util.round_up_to_odd(steps)) for size, steps in self.pyr_levels], images, self.kernel_size, self.sigma)
         self.optimize_color(batch, pyramid, self.clone_params_tracking, lambda k: self.config.w_pho, reg_from_prev=True)
         self.checkpoint(batch, visualizations=[[View.GROUND_TRUTH, View.COLOR_OVERLAY, View.LANDMARKS, View.SHAPE]])
 
@@ -689,7 +690,7 @@ class FlashFlame(object):
             images = self.parse_batch(batch)[0]
             h, w = images.shape[2:4]
             pyramid_size = np.array([h, w])
-            pyramid = util.get_gaussian_pyramid([(pyramid_size * size, util.round_up_to_odd(steps * 2)) for size, steps in self.sampling], images, self.kernel_size, self.sigma)
+            pyramid = util.get_gaussian_pyramid([(pyramid_size * size, util.round_up_to_odd(steps * 2)) for size, steps in self.pyr_levels], images, self.kernel_size, self.sigma)
             weighting = lambda k: self.config.w_pho
             if i == 0:
                 self.optimize_camera(batch)
@@ -713,5 +714,5 @@ class FlashFlame(object):
 
 if __name__ == '__main__':
     config = parse_args()
-    ff = FlashFlame(config, device='cuda:0')
+    ff = Tracker(config, device='cuda:0')
     ff.run()

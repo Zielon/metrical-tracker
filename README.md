@@ -62,7 +62,7 @@ python tracker.py --cfg ./configs/actors/duda.yml
 - MediaPipe sometimes detects wrong landmarks for the first frame in the sequence. You might skip this frame in optimization.
 - there are many hyper-parameters involved in the optimization, please look at the `config.py` and tweak them to further improve
   your results.
-- the keypoints are frames for which global color and shape will be optimized, therefore select frames with neutral pose preferably.
+- the **keyframes** are the frames for which global color and shape will be optimized, therefore select frames with neutral pose preferably.
 
 ### Projects
 

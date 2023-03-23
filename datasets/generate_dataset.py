@@ -67,13 +67,12 @@ class GeneratorDataset(Dataset, ABC):
                     bbox = get_bbox(image, lmk, bb_scale=self.config.bbox_scale)
                     torch.save(bbox, bbox_path)
 
-                if h != self.config.image_size[0] or w != self.config.image_size[1]:
-                    if self.config.crop_image:
-                        image = crop_image_bbox(image, bbox)
+                if self.config.crop_image:
+                    image = crop_image_bbox(image, bbox)
                     if self.config.image_size[0] == self.config.image_size[1]:
                         image = squarefiy(image, size=self.config.image_size[0])
-                    else:
-                        image = cv2.resize(image, (self.config.image_size[1], self.config.image_size[0]), interpolation=cv2.INTER_CUBIC)
+                else:
+                    image = cv2.resize(image, (self.config.image_size[1], self.config.image_size[0]), interpolation=cv2.INTER_CUBIC)
 
                 lmk, dense_lmk = self.process_face(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
 
