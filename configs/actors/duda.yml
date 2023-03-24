@@ -6,4 +6,4 @@ optimize_shape: true
 optimize_jaw: true
 begin_frames: 1
 keyframes: [ 1, 2 ]
-pyr_levels: [ [ 0.5, 120 ], [ 1.0, 80 ], [ 2.0, 70 ] ]
+pyr_levels: [ [ 0.5, 90 ], [ 1.0, 90 ], [ 2.0, 90 ] ]
