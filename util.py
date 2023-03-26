@@ -1,15 +1,4 @@
 # -*- coding: utf-8 -*-
-import glob
-
-import cv2
-import numpy as np
-import torch
-import torch.nn.functional as F
-from torch import nn
-from torchvision.transforms.functional import gaussian_blur
-from tqdm import tqdm
-
-from flame.mediapipe.landmarks import LIPS_LANDMARK_IDS, get_idx, NOSE_LANDMARK_IDS
 
 # Max-Planck-Gesellschaft zur Förderung der Wissenschaften e.V. (MPG) is
 # holder of all proprietary rights on this computer program.
@@ -24,6 +13,18 @@ from flame.mediapipe.landmarks import LIPS_LANDMARK_IDS, get_idx, NOSE_LANDMARK_
 # for Intelligent Systems. All rights reserved.
 #
 # Contact: mica@tue.mpg.de
+
+import glob
+
+import cv2
+import numpy as np
+import torch
+import torch.nn.functional as F
+from torch import nn
+from torchvision.transforms.functional import gaussian_blur
+from tqdm import tqdm
+
+from flame.mediapipe.landmarks import LIPS_LANDMARK_IDS, get_idx, NOSE_LANDMARK_IDS
 
 l1_loss = nn.SmoothL1Loss(beta=0.1)
 
