@@ -91,6 +91,7 @@ class Tracker(object):
         self.is_initializing = False
         self.image_size = torch.tensor([[config.image_size[0], config.image_size[1]]]).cuda()
         self.save_folder = self.config.save_folder
+        self.output_folder = os.path.join(self.save_folder, self.actor_name)
         self.checkpoint_folder = os.path.join(self.save_folder, self.actor_name, "checkpoint")
         self.input_folder = os.path.join(self.save_folder, self.actor_name, "input")
         self.pyramid_folder = os.path.join(self.save_folder, self.actor_name, "pyramid")
@@ -466,7 +467,7 @@ class Tracker(object):
             best_loss = np.inf
 
             for p in range(iters):
-                if p % 16 == 0 and p < iters:
+                if p % self.config.raster_update == 0:
                     self.diff_renderer.rasterizer.reset()
                 losses = {}
                 self.cameras = PerspectiveCameras(
@@ -506,15 +507,9 @@ class Tracker(object):
                 losses['reg/eye_lids'] = torch.sum((eyelids[:, 0] - eyelids[:, 1]) ** 2)
                 losses['reg/eye_left'] = torch.sum((I6D - left_eye) ** 2)
                 losses['reg/eye_right'] = torch.sum((I6D - right_eye) ** 2)
-
-                if util.is_optimizable('shape', params):
-                    losses['reg/shape'] = torch.sum((shape - self.mica_shape) ** 2) * self.config.w_shape
-
-                if util.is_optimizable('tex', params):
-                    losses['reg/tex'] = torch.sum(tex ** 2) * self.config.w_tex
-
-                if util.is_optimizable('principal_point', params):
-                    losses['reg/pp'] = torch.sum(pp ** 2)
+                losses['reg/shape'] = torch.sum((shape - self.mica_shape) ** 2) * self.config.w_shape
+                losses['reg/tex'] = torch.sum(tex ** 2) * self.config.w_tex
+                losses['reg/pp'] = torch.sum(pp ** 2)
 
                 # Temporal smoothing (only to t - 1)
                 if reg_from_prev:
@@ -657,6 +652,9 @@ class Tracker(object):
             self.optimize_frame(batch)
             self.frame += 1
 
+    def output_video(self):
+        util.images_to_video(self.output_folder, self.config.fps)
+
     def parse_batch(self, batch):
         images = batch['image']
         landmarks = batch['lmk']
@@ -710,6 +708,7 @@ class Tracker(object):
             self.frame = 0
 
         self.optimize_video()
+        self.output_video()
 
 
 if __name__ == '__main__':

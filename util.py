@@ -1,4 +1,15 @@
 # -*- coding: utf-8 -*-
+import glob
+
+import cv2
+import numpy as np
+import torch
+import torch.nn.functional as F
+from torch import nn
+from torchvision.transforms.functional import gaussian_blur
+from tqdm import tqdm
+
+from flame.mediapipe.landmarks import LIPS_LANDMARK_IDS, get_idx, NOSE_LANDMARK_IDS
 
 # Max-Planck-Gesellschaft zur Förderung der Wissenschaften e.V. (MPG) is
 # holder of all proprietary rights on this computer program.
@@ -13,15 +24,6 @@
 # for Intelligent Systems. All rights reserved.
 #
 # Contact: mica@tue.mpg.de
-
-import cv2
-import numpy as np
-import torch
-import torch.nn.functional as F
-from torch import nn
-from torchvision.transforms.functional import gaussian_blur
-
-from flame.mediapipe.landmarks import LIPS_LANDMARK_IDS, get_idx, NOSE_LANDMARK_IDS
 
 l1_loss = nn.SmoothL1Loss(beta=0.1)
 
@@ -360,6 +362,21 @@ def dump_point_cloud(name, view):
 
 def round_up_to_odd(f):
     return int(np.ceil(f) // 2 * 2 + 1)
+
+
+def images_to_video(path, fps=25, src='video', video_format='DIVX'):
+    img_array = []
+    for filename in tqdm(sorted(glob.glob(f'{path}/{src}/*.jpg'))):
+        img = cv2.imread(filename)
+        height, width, layers = img.shape
+        size = (width, height)
+        img_array.append(img)
+
+    out = cv2.VideoWriter(f'{path}/video.avi', cv2.VideoWriter_fourcc(*video_format), fps, size)
+
+    for i in range(len(img_array)):
+        out.write(img_array[i])
+    out.release()
 
 
 def grid_sample(image, optical, align_corners=False):

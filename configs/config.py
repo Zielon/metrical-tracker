@@ -41,6 +41,7 @@ cfg.end_frames = 0
 cfg.image_size = [512, 512]  # height, width
 cfg.rotation_lr = 0.05
 cfg.translation_lr = 0.003
+cfg.raster_update = 16
 cfg.pyr_levels = [[0.5, 90], [1.0, 80], [2.0, 70]]  # Gaussian pyramid levels (scaling, iters per level)
 cfg.optimize_shape = False
 cfg.optimize_jaw = False
