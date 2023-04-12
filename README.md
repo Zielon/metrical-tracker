@@ -16,7 +16,9 @@ Bolkart</a>, <a href="https://justusthies.github.io/" target="_blank">Justus Thi
 <div align="center"> 
 <img src="documents/teaser.gif">
 <br>
-<i style="font-size: 1.05em;">Official Repository for ECCV 2022 Metrical Photometric Tracker (from MICA)</i>
+<b style="font-size: 1.05em;">From the left: RGB Input, Estimated Texture, Predicted Landmarks (red), FLAME Geometry.</b>
+<br>
+<i style="font-size: 1.05em;">Official Repository for ECCV 2022 Metrical Photometric Tracker (from MICA).</i>
 </div>
 
 ### Description
