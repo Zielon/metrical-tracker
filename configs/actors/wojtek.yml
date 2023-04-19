@@ -5,6 +5,4 @@ save_folder: './output/'
 optimize_shape: true
 optimize_jaw: true
 begin_frames: 1
-keyframes: [ 1, 2, 3, 4 ]
-rotation_lr: 0.075
-pyr_levels: [ [ 0.5, 90 ], [ 1.0, 90 ], [ 2.0, 90 ] ]
+keyframes: [ 1, 2, 3 ]

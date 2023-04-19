@@ -90,28 +90,33 @@ def l2_distance(verts1, verts2):
     return torch.sqrt(((verts1 - verts2) ** 2).sum(2)).mean(1).mean()
 
 
-def lmk_loss(opt_lmks, target_lmks, image_size, lmk_mask):
+def scale_lmks(opt_lmks, target_lmks, image_size):
     h, w = image_size
     size = torch.tensor([1 / w, 1 / h]).float().cuda()[None, None, ...]
+    opt_lmks = opt_lmks * size
+    target_lmks = target_lmks * size
+    return opt_lmks, target_lmks
+
+
+def lmk_loss(opt_lmks, target_lmks, image_size, lmk_mask):
+    opt_lmks, target_lmks = scale_lmks(opt_lmks, target_lmks, image_size)
     diff = torch.pow(opt_lmks - target_lmks, 2)
-    return (diff * size * lmk_mask).mean()
+    return (diff * lmk_mask).mean()
 
 
 def face_lmk_loss(opt_lmks, target_lmks, image_size, is_mediapipe, lmk_mask):
-    h, w = image_size
-    size = torch.tensor([1 / w, 1 / h]).float().cuda()[None, None, ...]
+    opt_lmks, target_lmks = scale_lmks(opt_lmks, target_lmks, image_size)
     diff = torch.pow(opt_lmks - target_lmks, 2)
     if not is_mediapipe:
-        return (diff * face_mask * nose_mask * oval_mask * size * lmk_mask).mean()
-    return (diff * nose_mask_mp * size * lmk_mask).mean()
+        return (diff * face_mask * nose_mask * oval_mask * lmk_mask).mean()
+    return (diff * nose_mask_mp * lmk_mask).mean()
 
 
 def oval_lmk_loss(opt_lmks, target_lmks, image_size, lmk_mask):
     oval_ids = [i for i in range(17)]
-    h, w = image_size
-    size = torch.tensor([1 / w, 1 / h]).float().cuda()[None, None, ...]
+    opt_lmks, target_lmks = scale_lmks(opt_lmks, target_lmks, image_size)
     diff = torch.pow(opt_lmks[:, oval_ids, :] - target_lmks[:, oval_ids, :], 2)
-    return (diff * size * lmk_mask[:, oval_ids, :]).mean()
+    return (diff * lmk_mask[:, oval_ids, :]).mean()
 
 
 def mouth_lmk_loss(opt_lmks, target_lmks, image_size, is_mediapipe, lmk_mask):
@@ -119,32 +124,29 @@ def mouth_lmk_loss(opt_lmks, target_lmks, image_size, is_mediapipe, lmk_mask):
         mouth_ids = [i for i in range(49, 68)]
     else:
         mouth_ids = get_idx(LIPS_LANDMARK_IDS)
-    h, w = image_size
-    size = torch.tensor([1 / w, 1 / h]).float().cuda()[None, None, ...]
+    opt_lmks, target_lmks = scale_lmks(opt_lmks, target_lmks, image_size)
     diff = torch.pow(opt_lmks[:, mouth_ids, :] - target_lmks[:, mouth_ids, :], 2)
-    return (diff * size * lmk_mask[:, mouth_ids, :]).mean()
+    return (diff * lmk_mask[:, mouth_ids, :]).mean()
 
 
 def eye_closure_lmk_loss(opt_lmks, target_lmks, image_size, lmk_mask):
     upper_eyelid_lmk_ids = [47, 46, 45, 29, 30, 31]
     lower_eyelid_lmk_ids = [39, 40, 41, 25, 24, 23]
-    h, w = image_size
-    size = torch.tensor([1 / w, 1 / h]).float().cuda()[None, None, ...]
+    opt_lmks, target_lmks = scale_lmks(opt_lmks, target_lmks, image_size)
     diff_opt = opt_lmks[:, upper_eyelid_lmk_ids, :] - opt_lmks[:, lower_eyelid_lmk_ids, :]
     diff_target = target_lmks[:, upper_eyelid_lmk_ids, :] - target_lmks[:, lower_eyelid_lmk_ids, :]
     diff = torch.pow(diff_opt - diff_target, 2)
-    return (diff * size * lmk_mask[:, upper_eyelid_lmk_ids, :]).mean()
+    return (diff * lmk_mask[:, upper_eyelid_lmk_ids, :]).mean()
 
 
 def mouth_closure_lmk_loss(opt_lmks, target_lmks, image_size, lmk_mask):
     upper_mouth_lmk_ids = [49, 50, 51, 52, 53, 61, 62, 63]
     lower_mouth_lmk_ids = [59, 58, 57, 56, 55, 67, 66, 65]
-    h, w = image_size
-    size = torch.tensor([1 / w, 1 / h]).float().cuda()[None, None, ...]
+    opt_lmks, target_lmks = scale_lmks(opt_lmks, target_lmks, image_size)
     diff_opt = opt_lmks[:, upper_mouth_lmk_ids, :] - opt_lmks[:, lower_mouth_lmk_ids, :]
     diff_target = target_lmks[:, upper_mouth_lmk_ids, :] - target_lmks[:, lower_mouth_lmk_ids, :]
     diff = torch.pow(diff_opt - diff_target, 2)
-    return (diff * size * lmk_mask[:, upper_mouth_lmk_ids, :]).mean()
+    return (diff * lmk_mask[:, upper_mouth_lmk_ids, :]).mean()
 
 
 def pixel_loss(opt_img, target_img, mask=None):
@@ -373,11 +375,11 @@ def images_to_video(path, fps=25, src='video', video_format='DIVX'):
         size = (width, height)
         img_array.append(img)
 
-    out = cv2.VideoWriter(f'{path}/video.avi', cv2.VideoWriter_fourcc(*video_format), fps, size)
-
-    for i in range(len(img_array)):
-        out.write(img_array[i])
-    out.release()
+    if len(img_array) > 0:
+        out = cv2.VideoWriter(f'{path}/video.avi', cv2.VideoWriter_fourcc(*video_format), fps, size)
+        for i in range(len(img_array)):
+            out.write(img_array[i])
+        out.release()
 
 
 def grid_sample(image, optical, align_corners=False):

@@ -23,6 +23,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from pytorch3d.transforms import rotation_6d_to_matrix, matrix_to_rotation_6d
+from skimage.io import imread
+from loguru import logger
 
 from flame.lbs import lbs
 
@@ -64,7 +66,7 @@ class FLAME(nn.Module):
 
     def __init__(self, config):
         super(FLAME, self).__init__()
-        print("Creating the FLAME Decoder")
+        logger.info(f"[FLAME] Creating the 3DMM from {config.flame_geom_path}")
         with open(config.flame_geom_path, 'rb') as f:
             ss = pickle.load(f, encoding='latin1')
             flame_model = Struct(**ss)
@@ -293,11 +295,20 @@ class FLAMETex(nn.Module):
         n_tex = config.tex_params
         texture_mean = torch.from_numpy(texture_mean).float()[None, ...] * scale
         texture_basis = torch.from_numpy(texture_basis[:, :n_tex]).float()[None, ...] * scale
+        self.texture = None
         self.register_buffer('texture_mean', texture_mean)
         self.register_buffer('texture_basis', texture_basis)
         self.image_size = config.image_size
+        self.check_texture(config)
+
+    def check_texture(self, config):
+        path = os.path.join(config.actor, 'texture.png')
+        if os.path.exists(path):
+            self.texture = torch.from_numpy(imread(path)).permute(2, 0, 1).cuda()[None, 0:3, :, :] / 255.0
 
     def forward(self, texcode):
+        if self.texture is not None:
+            return F.interpolate(self.texture, self.image_size, mode='bilinear')
         texture = self.texture_mean + (self.texture_basis * texcode[:, None, :]).sum(-1)
         texture = texture.reshape(texcode.shape[0], 512, 512, 3).permute(0, 3, 1, 2)
         texture = F.interpolate(texture, self.image_size, mode='bilinear')

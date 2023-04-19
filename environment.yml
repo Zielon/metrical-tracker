@@ -160,7 +160,7 @@ dependencies:
       - markdown==3.4.1
       - markupsafe==2.1.2
       - matplotlib==3.7.1
-      - mediapipe==0.9.1.0
+      - mediapipe==0.9.3.0
       - networkx==3.0
       - numba==0.56.4
       - oauthlib==3.2.2
@@ -177,6 +177,7 @@ dependencies:
       - rsa==4.9
       - scikit-image==0.20.0
       - scipy==1.9.1
+      - sounddevice==0.4.6
       - tensorboard==2.12.0
       - tensorboard-data-server==0.7.0
       - tensorboard-plugin-wit==1.8.1
