@@ -149,11 +149,9 @@ def mouth_closure_lmk_loss(opt_lmks, target_lmks, image_size, lmk_mask):
     return (diff * lmk_mask[:, upper_mouth_lmk_ids, :]).mean()
 
 
-def pixel_loss(opt_img, target_img, mask=None):
-    if mask is None:
-        mask = torch.ones_like(opt_img)
-    n_pixels = torch.sum((mask[:, 0, ...] > 0).int()).detach().float()
-    loss = (mask * (opt_img - target_img)).abs()
+def pixel_loss(opt_img, target_img, mask):
+    n_pixels = torch.sum(mask)
+    loss = mask * (opt_img - target_img).abs()
     loss = torch.sum(loss) / n_pixels
     return loss
 

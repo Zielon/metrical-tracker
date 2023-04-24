@@ -1,0 +1,12 @@
+# Tracker config
+
+actor: './input/obama'
+save_folder: './output/'
+flame_geom_path: 'data/FLAME2023/generic_no_jaw.pkl'
+optimize_shape: true
+optimize_jaw: true
+begin_frames: 269
+end_frames: 2900
+keyframes: [ 0, 1, 2, 3 ]
+pyr_levels: [ [ 0.25, 8 ], [ 0.5, 8 ], [ 1.0, 8 ] ]
+raster_update: 4

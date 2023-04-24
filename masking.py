@@ -79,10 +79,13 @@ class Masking(nn.Module):
         return self.masks.lips
 
     def get_mask_rendering(self):
-        face_mask = torch.ones_like(self.vertices)[None]
-        face_mask[:, self.masks.boundary, :] = 0.0
-        face_mask[:, self.masks.left_ear, :] = 0.0
-        face_mask[:, self.masks.right_ear, :] = 0.0
+        face_mask = torch.zeros_like(self.vertices)[None]
+        # face_mask[:, self.masks.boundary, :] = 0.0
+        # face_mask[:, self.masks.left_ear, :] = 0.0
+        # face_mask[:, self.masks.right_ear, :] = 0.0
+        face_mask[:, self.masks.face, :] = 1.0
+        face_mask[:, self.masks.left_eyeball, :] = 1.0
+        face_mask[:, self.masks.right_eyeball, :] = 1.0
         return face_mask
 
     def get_mask_depth(self):

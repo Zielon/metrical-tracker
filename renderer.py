@@ -161,11 +161,12 @@ class Renderer(nn.Module):
         attributes = torch.cat([uv, face_vertices_ndc, face_normals, face_mask, face_vertices_view, render_mask, depth_mask, eyes_region_mask, eyes_mask], -1)
         rendering, zbuffer = self.rasterizer(meshes_world, attributes, cameras=cameras)
 
-        uvcoords_images = rendering[:, 0:3, :, :].detach()
+        uvcoords_images = rendering[:, 0:3, :, :]
         ndc_vertices_images = rendering[:, 3:6, :, :]
+        view_vertices_images = rendering[:, 12:15, :, :]
+
         normal_images = rendering[:, 6:9, :, :].detach()
         mask_images_mesh = rendering[:, 9:12, :, :].detach()
-        view_vertices_images = rendering[:, 12:15, :, :]
         mask_images_rendering = rendering[:, 15:18, :, :].detach()
         mask_images_depth = rendering[:, 18:21, :, :].detach()
         mask_images_eyes_region = rendering[:, 21:24, :, :].detach()
@@ -184,12 +185,12 @@ class Renderer(nn.Module):
             'images': images * alpha_images,
             'albedo_images': albedo_images,
             'alpha_images': alpha_images,
-            'mask_images': (mask_images * alpha_images > 0).float(),
-            'mask_images_mesh': (mask_images_mesh > 0).float(),
-            'mask_images_rendering': (mask_images_rendering > 0).float(),
-            'mask_images_depth': (mask_images_depth > 0).float(),
-            'mask_images_eyes_region': (mask_images_eyes_region > 0).float(),
-            'mask_images_eyes': (mask_images_eyes > 0).float(),
+            'mask_images': mask_images * alpha_images,
+            'mask_images_mesh': mask_images_mesh,
+            'mask_images_rendering': mask_images_rendering,
+            'mask_images_depth': mask_images_depth,
+            'mask_images_eyes_region': mask_images_eyes_region,
+            'mask_images_eyes': mask_images_eyes,
             'position_images': ndc_vertices_images,
             'position_view_images': view_vertices_images,
             'zbuffer': zbuffer
