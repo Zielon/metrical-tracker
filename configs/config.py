@@ -58,7 +58,7 @@ cfg.w_lmks_iris = 1000
 cfg.w_lmks_oval = 5000
 
 cfg.w_exp = 0.02
-cfg.w_shape = 0.2
+cfg.w_shape = 0.25
 cfg.w_tex = 0.04
 
 

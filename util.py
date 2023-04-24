@@ -36,13 +36,6 @@ face_mask[:, [36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47], :] = 0
 nose_mask[:, [27, 28, 29, 30, 31, 32, 33, 34, 35], :] *= 4.0
 oval_mask[:, [i for i in range(17)], :] *= 0.4
 
-nose_mask_mp = torch.ones([1, 105, 2]).cuda().float()
-face_mask_mp = torch.ones([1, 105, 2]).cuda().float()
-
-nose_mask_mp[:, get_idx(NOSE_LANDMARK_IDS), :] *= 8.0
-
-
-# face_mask_mp[:, get_idx(LEFT_EYE_LANDMARK_IDS) + get_idx(RIGHT_EYE_LANDMARK_IDS), :] *= 0.1
 
 
 # Input is R, t in opencv spave
@@ -109,7 +102,7 @@ def face_lmk_loss(opt_lmks, target_lmks, image_size, is_mediapipe, lmk_mask):
     diff = torch.pow(opt_lmks - target_lmks, 2)
     if not is_mediapipe:
         return (diff * face_mask * nose_mask * oval_mask * lmk_mask).mean()
-    return (diff * nose_mask_mp * lmk_mask).mean()
+    return (diff * lmk_mask).mean()
 
 
 def oval_lmk_loss(opt_lmks, target_lmks, image_size, lmk_mask):
@@ -137,6 +130,13 @@ def eye_closure_lmk_loss(opt_lmks, target_lmks, image_size, lmk_mask):
     diff_target = target_lmks[:, upper_eyelid_lmk_ids, :] - target_lmks[:, lower_eyelid_lmk_ids, :]
     diff = torch.pow(diff_opt - diff_target, 2)
     return (diff * lmk_mask[:, upper_eyelid_lmk_ids, :]).mean()
+
+
+def eye_lids_lmk_loss(opt_lmks, target_lmks, image_size, lmk_mask):
+    eyelid_lmk_ids = [i for i in range(20, 20 + 32)]
+    opt_lmks, target_lmks = scale_lmks(opt_lmks, target_lmks, image_size)
+    diff = torch.pow(opt_lmks[:, eyelid_lmk_ids, :] - target_lmks[:, eyelid_lmk_ids, :], 2)
+    return (diff * lmk_mask[:, eyelid_lmk_ids, :]).mean()
 
 
 def mouth_closure_lmk_loss(opt_lmks, target_lmks, image_size, lmk_mask):
@@ -374,7 +374,7 @@ def images_to_video(path, fps=25, src='video', video_format='DIVX'):
         img_array.append(img)
 
     if len(img_array) > 0:
-        out = cv2.VideoWriter(f'{path}/video.avi', cv2.VideoWriter_fourcc(*video_format), fps, size)
+        out = cv2.VideoWriter(f'{path}/{src}.avi', cv2.VideoWriter_fourcc(*video_format), fps, size)
         for i in range(len(img_array)):
             out.write(img_array[i])
         out.release()

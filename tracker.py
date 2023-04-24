@@ -464,6 +464,7 @@ class Tracker(object):
                 losses['lmk_oval'] = util.oval_lmk_loss(points68, landmarks[..., :2], [h, w], lmk_mask) * self.config.w_lmks_oval
                 losses['lmk_mouth'] = util.mouth_lmk_loss(pointsMP, landmarks_dense[..., :2], [h, w], True, lmk_dense_mask) * self.config.w_lmks_mouth
                 losses['lmk_eye'] = util.eye_closure_lmk_loss(pointsMP, landmarks_dense[..., :2], [h, w], lmk_dense_mask) * self.config.w_lmks_lid
+                losses['lmk_eyelids'] = util.eye_lids_lmk_loss(pointsMP, landmarks_dense[..., :2], [h, w], lmk_dense_mask) * self.config.w_lmks_lid
                 losses['lmk_iris_left'] = util.lmk_loss(proj_vertices[:, left_iris_flame, ...], left_iris, [h, w], mask_left_iris) * self.config.w_lmks_iris
                 losses['lmk_iris_right'] = util.lmk_loss(proj_vertices[:, right_iris_flame, ...], right_iris, [h, w], mask_right_iris) * self.config.w_lmks_iris
 
@@ -584,7 +585,7 @@ class Tracker(object):
             fl = nn.Parameter(self.focal_length.detach().clone())
             pp = nn.Parameter(self.principal_point.detach().clone())
 
-            max_iters = 8
+            max_iters = 16
             params = [shape, exp, eyelids, eyes, jaw, sh, R, t, fl, pp]
 
             if self.dense_frame == 0:
@@ -592,7 +593,7 @@ class Tracker(object):
 
             if not self.is_initializing:
                 params = [exp, eyelids, eyes, jaw, sh, R, t]
-                max_iters = 2
+                max_iters = 4
 
             optimizer = torch.optim.LBFGS(params, lr=1.0, max_iter=32, line_search_fn="strong_wolfe")
             # optimizer = torch.optim.Adam(params, lr=0.01)
@@ -640,6 +641,7 @@ class Tracker(object):
                 losses['loss/lmk_oval'] = util.oval_lmk_loss(proj_lmks68, image_lmks68, image_size, lmk_mask) * self.config.w_lmks_oval
                 losses['loss/lmk_MP'] = util.face_lmk_loss(proj_lmksMP, image_lmksMP, image_size, True, lmk_dense_mask) * self.config.w_lmks
                 losses['loss/lmk_eye'] = util.eye_closure_lmk_loss(proj_lmksMP, image_lmksMP, image_size, lmk_dense_mask) * self.config.w_lmks_lid
+                losses['loss/lmk_eyelids'] = util.eye_lids_lmk_loss(proj_lmksMP, image_lmksMP, image_size, lmk_dense_mask) * self.config.w_lmks_lid
                 losses['loss/lmk_mouth'] = util.mouth_lmk_loss(proj_lmksMP, image_lmksMP, image_size, True, lmk_dense_mask) * self.config.w_lmks_mouth
                 losses['loss/lmk_iris_left'] = util.lmk_loss(proj_vertices[:, left_iris_flame, ...], left_iris, image_size, mask_left_iris) * self.config.w_lmks_iris
                 losses['loss/lmk_iris_right'] = util.lmk_loss(proj_vertices[:, right_iris_flame, ...], right_iris, image_size, mask_right_iris) * self.config.w_lmks_iris
@@ -817,7 +819,8 @@ class Tracker(object):
         return -1
 
     def output_video(self):
-        util.images_to_video(self.output_folder, self.config.fps)
+        util.images_to_video(self.output_folder, self.config.fps, src='video')
+        util.images_to_video(self.output_folder, self.config.fps, src='sparse')
 
     def parse_batch(self, batch):
         images = batch['image']
