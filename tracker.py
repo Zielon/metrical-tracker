@@ -709,6 +709,7 @@ class Tracker(object):
 
     def run(self):
         self.prepare_data()
+
         if not self.load_checkpoint():
             self.initialize_tracking()
             self.frame = 0
