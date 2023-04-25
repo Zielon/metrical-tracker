@@ -2,7 +2,7 @@
 
 actor: './input/obama'
 save_folder: './output/'
-flame_geom_path: 'data/FLAME2023/generic_no_jaw.pkl'
+flame_geom_path: 'data/FLAME2023/generic.pkl'
 optimize_shape: true
 optimize_jaw: true
 begin_frames: 269

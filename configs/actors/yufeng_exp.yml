@@ -1,0 +1,11 @@
+# Tracker config
+
+actor: './input/yufeng_exp'
+save_folder: './output/'
+optimize_shape: true
+optimize_jaw: true
+begin_frames: 150
+end_frames: 1000
+keyframes: [ 0, 1, 2 ]
+pyr_levels: [ [ 0.25, 8 ], [ 0.5, 8 ], [ 1.0, 8 ] ]
+raster_update: 1

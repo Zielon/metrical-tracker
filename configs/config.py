@@ -24,7 +24,7 @@ cfg = CN()
 cfg.flame_geom_path = 'data/FLAME2020/generic_model.pkl'
 cfg.flame_template_path = 'data/uv_template.obj'
 cfg.flame_lmk_path = 'data/landmark_embedding.npy'
-cfg.tex_space_path = 'data/FLAME2020/FLAME_texture.npz'
+cfg.tex_space_path = 'data/FLAME2020/FLAME_albedo_from_BFM.npz'
 
 cfg.num_shape_params = 300
 cfg.num_exp_params = 100
@@ -50,16 +50,16 @@ cfg.crop_image = True
 cfg.save_folder = './output/'
 
 # Weights
-cfg.w_pho = 250
-cfg.w_lmks = 10000
+cfg.w_pho = 300
+cfg.w_lmks = 15000
 cfg.w_lmks_lid = 1000
 cfg.w_lmks_mouth = 15000
 cfg.w_lmks_iris = 1000
 cfg.w_lmks_oval = 5000
 
-cfg.w_exp = 0.02
+cfg.w_exp = 0.05
 cfg.w_shape = 0.25
-cfg.w_tex = 0.04
+cfg.w_tex = 0.05
 
 
 def get_cfg_defaults():

@@ -181,7 +181,7 @@ class Tracker(object):
         self.jaw = to_gpu(flame_params['jaw'])
 
         self.sparse_frame = int(payload['sparse_frame'])
-        self.dense_frame = int(payload['dense_frame'])
+        self.dense_frame = 0 # int(payload['dense_frame'])
         self.global_step = payload['global_step']
 
         self.image_size = torch.from_numpy(payload['img_size'])[None].to(self.device)
@@ -314,7 +314,7 @@ class Tracker(object):
 
     def parse_mask(self, ops, visualization=False):
         _, _, h, w = ops['alpha_images'].shape
-        result = ops['mask_images_rendering']  # * 0.25 + ops['mask_images']
+        result = ops['mask_images']  # * 0.25 + ops['mask_images']
 
         # Lower the region for eyes blinking
         # if not self.is_initializing:
@@ -322,7 +322,7 @@ class Tracker(object):
         #     result = (1.0 - eyes) * result + eyes * 1.5
 
         if visualization:
-            result = ops['mask_images_rendering']
+            result = ops['mask_images']
 
         return result.detach()
 
@@ -436,6 +436,7 @@ class Tracker(object):
 
             optimizer = torch.optim.LBFGS(
                 [R, T, exp, eyes, eyelids, jaw],
+                lr=0.5,
                 max_iter=32,
                 line_search_fn="strong_wolfe")
 
@@ -485,9 +486,10 @@ class Tracker(object):
 
                 optimizer.zero_grad()
                 all_loss.backward()
+
                 return all_loss
 
-            for _ in range(6):
+            for _ in range(4):
                 optimizer.step(closure)
 
             self.R[self.sparse_frame] = nn.Parameter(R.detach().clone())
@@ -570,6 +572,8 @@ class Tracker(object):
         if self.dense_frame > 0:
             frame -= 1
 
+        levels = len(pyramid)
+
         for k, level in enumerate(pyramid):
             img, iters, size, image_size = level
 
@@ -585,7 +589,7 @@ class Tracker(object):
             fl = nn.Parameter(self.focal_length.detach().clone())
             pp = nn.Parameter(self.principal_point.detach().clone())
 
-            max_iters = 16
+            max_iters = 8
             params = [shape, exp, eyelids, eyes, jaw, sh, R, t, fl, pp]
 
             if self.dense_frame == 0:
@@ -595,7 +599,7 @@ class Tracker(object):
                 params = [exp, eyelids, eyes, jaw, sh, R, t]
                 max_iters = 4
 
-            optimizer = torch.optim.LBFGS(params, lr=1.0, max_iter=32, line_search_fn="strong_wolfe")
+            optimizer = torch.optim.LBFGS(params, lr=1.0 / (k + 1), max_iter=32, line_search_fn="strong_wolfe")
             # optimizer = torch.optim.Adam(params, lr=0.01)
 
             scale = image_size[0] / h
@@ -658,7 +662,15 @@ class Tracker(object):
                 losses['reg/tex'] = torch.sum(tex ** 2) * self.config.w_tex
                 losses['reg/pp'] = torch.sum(pp ** 2)
 
-                # Temporal smoothing (only to t - 1)
+                # Temporal smoothing (only to t - 1) L1
+                # if 0 < self.dense_frame < len(self.dataset) and not self.is_initializing:
+                #     losses['reg/T-1'] = torch.sum((self.t[self.dense_frame - 1].clone().detach() - t).abs()) * 0.1
+                #     losses['reg/R-1'] = torch.sum((self.R[self.dense_frame - 1].clone().detach() - R).abs()) * 0.1
+                #     losses['reg/exp-1'] = torch.sum((self.exp[self.dense_frame - 1].clone().detach() - exp).abs()) * 0.1
+                #
+                #     losses['reg/T+1'] = torch.sum((self.t[self.dense_frame + 1].clone().detach() - t).abs()) * 0.1
+                #     losses['reg/R+1'] = torch.sum((self.R[self.dense_frame + 1].clone().detach() - R).abs()) * 0.1
+                #     losses['reg/exp+1'] = torch.sum((self.exp[self.dense_frame + 1].clone().detach() - exp).abs()) * 0.1
 
                 # Render RGB
                 albedos = self.flametex(tex)
@@ -744,7 +756,7 @@ class Tracker(object):
             ops = self.diff_renderer(vertices, albedos, self.sh[frame], cameras=self.cameras)
             mask = (self.parse_mask(ops, visualization=True) > 0).float()
             predicted_images = (ops['images'] * mask + (images * (1.0 - mask)))[0]
-            shape_mask = ((ops['alpha_images'] * ops['mask_images_rendering']) > 0.).int()[0]
+            shape_mask = ((ops['alpha_images'] * ops['mask_images']) > 0.).int()[0]
 
             final_views = []
 
@@ -878,6 +890,7 @@ class Tracker(object):
 
         self.is_initializing = False
         self.save_canonical()
+        self.dense_frame = 0
 
     def run(self):
         self.prepare_data()
