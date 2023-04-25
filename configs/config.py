@@ -50,15 +50,15 @@ cfg.crop_image = True
 cfg.save_folder = './output/'
 
 # Weights
-cfg.w_pho = 300
+cfg.w_pho = 1000
 cfg.w_lmks = 15000
 cfg.w_lmks_lid = 1000
 cfg.w_lmks_mouth = 15000
 cfg.w_lmks_iris = 1000
-cfg.w_lmks_oval = 5000
+cfg.w_lmks_oval = 2000
 
-cfg.w_exp = 0.05
-cfg.w_shape = 0.25
+cfg.w_exp = 0.02
+cfg.w_shape = 0.3
 cfg.w_tex = 0.05
 
 

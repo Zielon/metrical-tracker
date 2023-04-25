@@ -181,7 +181,7 @@ class Tracker(object):
         self.jaw = to_gpu(flame_params['jaw'])
 
         self.sparse_frame = int(payload['sparse_frame'])
-        self.dense_frame = 0 # int(payload['dense_frame'])
+        self.dense_frame = int(payload['dense_frame'])
         self.global_step = payload['global_step']
 
         self.image_size = torch.from_numpy(payload['img_size'])[None].to(self.device)
@@ -599,7 +599,7 @@ class Tracker(object):
                 params = [exp, eyelids, eyes, jaw, sh, R, t]
                 max_iters = 4
 
-            optimizer = torch.optim.LBFGS(params, lr=1.0 / (k + 1), max_iter=32, line_search_fn="strong_wolfe")
+            optimizer = torch.optim.LBFGS(params, lr=1.0, max_iter=32, line_search_fn="strong_wolfe")
             # optimizer = torch.optim.Adam(params, lr=0.01)
 
             scale = image_size[0] / h
@@ -663,14 +663,14 @@ class Tracker(object):
                 losses['reg/pp'] = torch.sum(pp ** 2)
 
                 # Temporal smoothing (only to t - 1) L1
-                # if 0 < self.dense_frame < len(self.dataset) and not self.is_initializing:
-                #     losses['reg/T-1'] = torch.sum((self.t[self.dense_frame - 1].clone().detach() - t).abs()) * 0.1
-                #     losses['reg/R-1'] = torch.sum((self.R[self.dense_frame - 1].clone().detach() - R).abs()) * 0.1
-                #     losses['reg/exp-1'] = torch.sum((self.exp[self.dense_frame - 1].clone().detach() - exp).abs()) * 0.1
-                #
-                #     losses['reg/T+1'] = torch.sum((self.t[self.dense_frame + 1].clone().detach() - t).abs()) * 0.1
-                #     losses['reg/R+1'] = torch.sum((self.R[self.dense_frame + 1].clone().detach() - R).abs()) * 0.1
-                #     losses['reg/exp+1'] = torch.sum((self.exp[self.dense_frame + 1].clone().detach() - exp).abs()) * 0.1
+                if 0 < self.dense_frame < len(self.dataset) - 1 and not self.is_initializing:
+                    losses['reg/T-1'] = torch.sum((self.t[self.dense_frame - 1].clone().detach() - t).abs())
+                    losses['reg/R-1'] = torch.sum((self.R[self.dense_frame - 1].clone().detach() - R).abs())
+                    # losses['reg/exp-1'] = torch.sum((self.exp[self.dense_frame - 1].clone().detach() - exp).abs())
+
+                    losses['reg/T+1'] = torch.sum((self.t[self.dense_frame + 1].clone().detach() - t).abs())
+                    losses['reg/R+1'] = torch.sum((self.R[self.dense_frame + 1].clone().detach() - R).abs())
+                    # losses['reg/exp+1'] = torch.sum((self.exp[self.dense_frame + 1].clone().detach() - exp).abs())
 
                 # Render RGB
                 albedos = self.flametex(tex)
