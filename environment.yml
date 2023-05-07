@@ -49,7 +49,6 @@ dependencies:
   - cuda-toolkit=11.6.1=0
   - cuda-tools=11.6.1=0
   - cuda-visual-tools=11.6.1=0
-  - ffmpeg=4.3=hf484d3e_0
   - flit-core=3.6.0=pyhd3eb1b0_0
   - freetype=2.12.1=h4a9f257_0
   - fvcore=0.1.5.post20221221=pyhd8ed1ab_0

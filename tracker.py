@@ -501,7 +501,7 @@ class Tracker(object):
                 losses['loss/lmk_iris_right'] = util.lmk_loss(proj_vertices[:, right_iris_flame, ...], right_iris, image_size, mask_right_iris) * self.config.w_lmks_iris
 
                 # Increase landmark weight for the lower level of the pyramid
-                lmk_scale = np.exp(0.6 * len(pyramid) / (k + 1))
+                lmk_scale = np.exp(0.75 * len(pyramid) / (k + 1))
                 for key in losses.keys():
                     if "lmk_" in key:
                         losses[key] = losses[key] * lmk_scale
