@@ -4,4 +4,5 @@ actor: './input/duda'
 save_folder: './output/'
 optimize_shape: true
 optimize_jaw: true
-keyframes: [ 1, 2 ]
+begin_frames: 1
+keyframes: [ 0, 1 ]

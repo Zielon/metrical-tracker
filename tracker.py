@@ -342,13 +342,12 @@ class Tracker(object):
 
         return params
 
-    def clone_params_color(self):
+    def clone_params_initialization(self):
         params = [
             {'params': [nn.Parameter(self.exp.clone())], 'lr': 0.025, 'name': ['exp']},
             {'params': [nn.Parameter(self.eyes.clone())], 'lr': 0.001, 'name': ['eyes']},
             {'params': [nn.Parameter(self.eyelids.clone())], 'lr': 0.01, 'name': ['eyelids']},
             {'params': [nn.Parameter(self.sh.clone())], 'lr': 0.01, 'name': ['sh']},
-            {'params': [nn.Parameter(self.tex.clone())], 'lr': 0.005, 'name': ['tex']},
             {'params': [nn.Parameter(self.t.clone())], 'lr': 0.005, 'name': ['t']},
             {'params': [nn.Parameter(self.R.clone())], 'lr': 0.005, 'name': ['R']},
             {'params': [nn.Parameter(self.principal_point.clone())], 'lr': 0.001, 'name': ['principal_point']},
@@ -360,6 +359,14 @@ class Tracker(object):
 
         if self.config.optimize_jaw:
             params.append({'params': [nn.Parameter(self.jaw.clone().detach())], 'lr': 0.001, 'name': ['jaw']})
+
+        return params
+
+    def clone_params_color(self):
+        params = [
+            {'params': [nn.Parameter(self.sh.clone())], 'lr': 0.05, 'name': ['sh']},
+            {'params': [nn.Parameter(self.tex.clone())], 'lr': 0.05, 'name': ['tex']},
+        ]
 
         return params
 
@@ -689,19 +696,24 @@ class Tracker(object):
 
     def initialize_tracking(self):
         self.is_initializing = True
-        for i, j in enumerate(self.config.keyframes):
+        keyframes = self.config.keyframes
+        if len(keyframes) == 0:
+            logger.error('[ERROR] Keyframes are empty!')
+            exit(0)
+        keyframes.insert(0, keyframes[0])
+        for i, j in enumerate(keyframes):
             batch = self.to_cuda(self.dataset[j], unsqueeze=True)
             images = self.parse_batch(batch)[0]
             h, w = images.shape[2:4]
             pyramid_size = np.array([h, w])
             pyramid = util.get_gaussian_pyramid([(pyramid_size * size, util.round_up_to_odd(steps * 2)) for size, steps in self.pyr_levels], images, self.kernel_size, self.sigma)
-            weighting = lambda k: self.config.w_pho
+            params = self.clone_params_initialization
             if i == 0:
+                params = self.clone_params_color
                 self.optimize_camera(batch)
-                weighting = lambda k: self.config.w_pho if k > 0 else self.config.w_pho / 32.0
                 for k, level in enumerate(pyramid):
                     self.save_tensor(level[0], f"{self.pyramid_folder}/{k}.png")
-            self.optimize_color(batch, pyramid, self.clone_params_color, weighting)
+            self.optimize_color(batch, pyramid, params, lambda k: self.config.w_pho)
             self.checkpoint(batch, visualizations=[[View.GROUND_TRUTH, View.COLOR_OVERLAY, View.LANDMARKS, View.SHAPE]], frame_dst='/initialization')
             self.frame += 1
 
