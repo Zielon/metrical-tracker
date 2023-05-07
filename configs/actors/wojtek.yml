@@ -4,5 +4,4 @@ actor: './input/wojtek'
 save_folder: './output/'
 optimize_shape: true
 optimize_jaw: true
-begin_frames: 1
 keyframes: [ 1, 2, 3 ]

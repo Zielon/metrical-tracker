@@ -4,7 +4,6 @@ actor: './input/justin'
 save_folder: './output/'
 optimize_shape: true
 optimize_jaw: true
-begin_frames: 1
 keyframes: [ 1, 2, 3 ]
 crop_image: false
 image_size: [ 540, 960 ]  # height, width
