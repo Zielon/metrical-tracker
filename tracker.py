@@ -329,7 +329,7 @@ class Tracker(object):
 
     def clone_params_tracking(self):
         params = [
-            {'params': [nn.Parameter(self.exp.clone())], 'lr': 0.01, 'name': ['exp']},
+            {'params': [nn.Parameter(self.exp.clone())], 'lr': 0.025, 'name': ['exp']},
             {'params': [nn.Parameter(self.eyes.clone())], 'lr': 0.001, 'name': ['eyes']},
             {'params': [nn.Parameter(self.eyelids.clone())], 'lr': 0.001, 'name': ['eyelids']},
             {'params': [nn.Parameter(self.R.clone())], 'lr': self.config.rotation_lr, 'name': ['R']},

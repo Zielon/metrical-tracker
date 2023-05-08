@@ -39,7 +39,7 @@ cfg.fps = 25
 cfg.begin_frames = 0
 cfg.end_frames = 0
 cfg.image_size = [512, 512]  # height, width
-cfg.rotation_lr = 0.075
+cfg.rotation_lr = 0.15
 cfg.translation_lr = 0.003
 cfg.raster_update = 16
 cfg.pyr_levels = [[0.25, 90], [0.5, 90], [1.0, 90]]  # Gaussian pyramid levels (scaling, iters per level)
@@ -54,7 +54,7 @@ cfg.w_lmks = 5000
 cfg.w_lmks_lid = 1000
 cfg.w_lmks_mouth = 15000
 cfg.w_lmks_iris = 1000
-cfg.w_lmks_oval = 3000
+cfg.w_lmks_oval = 5000
 
 cfg.w_exp = 0.02
 cfg.w_shape = 0.3
