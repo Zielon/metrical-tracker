@@ -516,7 +516,7 @@ class Tracker(object):
                 # Reguralizers
                 losses['reg/exp'] = torch.sum(exp ** 2) * self.config.w_exp
                 losses['reg/sym'] = torch.sum((right_eye - left_eye) ** 2) * 8.0
-                losses['reg/jaw'] = torch.sum((I6D - jaw) ** 2) * 16.0
+                losses['reg/jaw'] = torch.sum((I6D - jaw) ** 2) * self.config.w_jaw
                 losses['reg/eye_lids'] = torch.sum((eyelids[:, 0] - eyelids[:, 1]) ** 2)
                 losses['reg/eye_left'] = torch.sum((I6D - left_eye) ** 2)
                 losses['reg/eye_right'] = torch.sum((I6D - right_eye) ** 2)
@@ -526,7 +526,7 @@ class Tracker(object):
 
                 # Temporal smoothing (only to t - 1)
                 if reg_from_prev:
-                    losses['reg/exp_prev_r'] = torch.sum((self.prev_exp - exp) ** 2) * 0.01
+                    losses['reg/exp_prev_r'] = torch.sum((self.prev_exp - exp) ** 2) * 0.05
                     losses['reg/trans_prev_r'] = torch.sum((self.prev_t - t) ** 2) * 100.0
                     losses['reg/rot_prev_r'] = torch.sum((self.prev_R - R) ** 2) * 100.0
 

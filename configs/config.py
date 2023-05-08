@@ -59,6 +59,7 @@ cfg.w_lmks_oval = 5000
 cfg.w_exp = 0.02
 cfg.w_shape = 0.3
 cfg.w_tex = 0.04
+cfg.w_jaw = 0.05
 
 
 def get_cfg_defaults():
