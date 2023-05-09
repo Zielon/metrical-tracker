@@ -304,12 +304,7 @@ class Tracker(object):
 
     def parse_mask(self, ops, batch, visualization=False):
         _, _, h, w = ops['alpha_images'].shape
-        result = ops['mask_images_rendering'] * 0.25 + ops['mask_images']
-
-        # Lower the region for eyes blinking
-        if not self.is_initializing:
-            eyes = ops['mask_images_eyes_region']
-            result = (1.0 - eyes) * result + eyes * 0.5
+        result = ops['mask_images_rendering']
 
         if visualization:
             result = ops['mask_images']
@@ -506,12 +501,6 @@ class Tracker(object):
                 losses['loss/lmk_mouth'] = util.mouth_lmk_loss(proj_lmksMP, image_lmksMP, image_size, True, lmk_dense_mask) * self.config.w_lmks_mouth
                 losses['loss/lmk_iris_left'] = util.lmk_loss(proj_vertices[:, left_iris_flame, ...], left_iris, image_size, mask_left_iris) * self.config.w_lmks_iris
                 losses['loss/lmk_iris_right'] = util.lmk_loss(proj_vertices[:, right_iris_flame, ...], right_iris, image_size, mask_right_iris) * self.config.w_lmks_iris
-
-                # Increase landmark weight for the lower level of the pyramid
-                lmk_scale = np.exp(0.75 * len(pyramid) / (k + 1))
-                for key in losses.keys():
-                    if "lmk_" in key:
-                        losses[key] = losses[key] * lmk_scale
 
                 # Reguralizers
                 losses['reg/exp'] = torch.sum(exp ** 2) * self.config.w_exp
