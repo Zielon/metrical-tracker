@@ -496,6 +496,7 @@ class Tracker(object):
 
                 # Landmarks sparse term
                 losses['loss/lmk_oval'] = util.oval_lmk_loss(proj_lmks68, image_lmks68, image_size, lmk_mask) * self.config.w_lmks_oval
+                losses['loss/lmk_68'] = util.lmk_loss(proj_lmks68, image_lmks68, image_size, lmk_mask) * self.config.w_lmks_68
                 losses['loss/lmk_MP'] = util.face_lmk_loss(proj_lmksMP, image_lmksMP, image_size, True, lmk_dense_mask) * self.config.w_lmks
                 losses['loss/lmk_eye'] = util.eye_closure_lmk_loss(proj_lmksMP, image_lmksMP, image_size, lmk_dense_mask) * self.config.w_lmks_lid
                 losses['loss/lmk_mouth'] = util.mouth_lmk_loss(proj_lmksMP, image_lmksMP, image_size, True, lmk_dense_mask) * self.config.w_lmks_mouth
@@ -513,20 +514,16 @@ class Tracker(object):
                 losses['reg/tex'] = torch.sum(tex ** 2) * self.config.w_tex
                 losses['reg/pp'] = torch.sum(pp ** 2)
 
-                # Temporal smoothing (only to t - 1)
-                if reg_from_prev:
-                    losses['reg/exp_prev_r'] = torch.sum((self.prev_exp - exp) ** 2) * 0.05
-                    losses['reg/trans_prev_r'] = torch.sum((self.prev_t - t) ** 2) * 100.0
-                    losses['reg/rot_prev_r'] = torch.sum((self.prev_R - R) ** 2) * 100.0
+                # Dense term (look at the config pyr_levels)
+                if k > 0 or self.is_initializing:
+                    albedos = self.flametex(tex)
+                    ops = self.diff_renderer(vertices, albedos, sh, self.cameras)
 
-                # Render RGB
-                albedos = self.flametex(tex)
-                ops = self.diff_renderer(vertices, albedos, sh, self.cameras)
+                    # Photometric dense term
+                    grid = ops['position_images'].permute(0, 2, 3, 1)[:, :, :, :2]
+                    sampled_image = F.grid_sample(flipped, grid * aspect_ratio, align_corners=False)
 
-                # Photometric dense term
-                grid = ops['position_images'].permute(0, 2, 3, 1)[:, :, :, :2]
-                sampled_image = F.grid_sample(flipped, grid * aspect_ratio, align_corners=False)
-                losses['loss/pho'] = util.pixel_loss(ops['images'], sampled_image, self.parse_mask(ops, batch)) * pho_weight_func(k)
+                    losses['loss/pho'] = util.pixel_loss(ops['images'], sampled_image, self.parse_mask(ops, batch)) * pho_weight_func(k)
 
                 all_loss = self.reduce_loss(losses)
                 optimizer.zero_grad()

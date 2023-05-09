@@ -41,8 +41,8 @@ cfg.end_frames = 0
 cfg.image_size = [512, 512]  # height, width
 cfg.rotation_lr = 0.2
 cfg.translation_lr = 0.003
-cfg.raster_update = 8
-cfg.pyr_levels = [[0.75, 90], [1.25, 90], [1.5, 90]]  # Gaussian pyramid levels (scaling, iters per level)
+cfg.raster_update = 10
+cfg.pyr_levels = [[1.0, 160], [0.5, 70], [1.0, 70]]  # Gaussian pyramid levels (scaling, iters per level) first level is only the sparse term!
 cfg.optimize_shape = False
 cfg.optimize_jaw = False
 cfg.crop_image = True
@@ -50,11 +50,12 @@ cfg.save_folder = './output/'
 
 # Weights
 cfg.w_pho = 350
-cfg.w_lmks = 5000
+cfg.w_lmks = 7000
+cfg.w_lmks_68 = 1000
 cfg.w_lmks_lid = 1000
-cfg.w_lmks_mouth = 10000
+cfg.w_lmks_mouth = 15000
 cfg.w_lmks_iris = 1000
-cfg.w_lmks_oval = 10000
+cfg.w_lmks_oval = 2000
 
 cfg.w_exp = 0.02
 cfg.w_shape = 0.3
