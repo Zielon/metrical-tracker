@@ -159,7 +159,7 @@ dependencies:
       - markdown==3.4.1
       - markupsafe==2.1.2
       - matplotlib==3.7.1
-      - mediapipe==0.9.3.0
+      - mediapipe==0.10.0
       - networkx==3.0
       - numba==0.56.4
       - oauthlib==3.2.2
