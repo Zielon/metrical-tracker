@@ -10,6 +10,7 @@ condor/logs
 condor/jobs
 
 .idea
+.vscode
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
