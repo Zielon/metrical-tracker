@@ -23,7 +23,7 @@ class GeneratorDataset(Dataset, ABC):
 
         self.initialize()
         self.face_detector_mediapipe = FaceDetector('google')
-        self.face_detector = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D, device=self.device)
+        self.face_detector = face_alignment.FaceAlignment(face_alignment.LandmarksType.TWO_D, device=self.device)
 
     def initialize(self):
         path = Path(self.source, 'source')
