@@ -73,7 +73,7 @@ This tracker has been used in the following projects:
 - [INSTA - Instant Volumetric Head Avatars (CVPR2023)](https://zielon.github.io/insta/)
 - [SHOW - Synchronous HOlistic body in the Wild (CVPR2023)](https://github.com/yhw-yhw/SHOW)
 - [MICA - Towards Metrical Reconstruction of Human Faces (ECCV2022)](https://zielon.github.io/mica/)
-- [IMITATOR - Personalized Speech-driven 3D Facial Animation](https://balamuruganthambiraja.github.io/Imitator/)
+- [IMITATOR - Personalized Speech-driven 3D Facial Animation (ICCV2023)](https://balamuruganthambiraja.github.io/Imitator/)
 
 ### Citation
 
